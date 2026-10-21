@@ -17,8 +17,8 @@ export const getStoredR2Config = (): R2Config => {
     accountId: import.meta.env.VITE_R2_ACCOUNT_ID || '',
     accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID || '',
     secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY || '',
-    bucketName: import.meta.env.VITE_R2_BUCKET_NAME || 'shema-hymns',
-    publicDomain: import.meta.env.VITE_R2_PUBLIC_DOMAIN || 'https://pub-your-id.r2.dev',
+    bucketName: import.meta.env.VITE_R2_BUCKET_NAME || 'shema-hymn',
+    publicDomain: import.meta.env.VITE_R2_PUBLIC_DOMAIN || 'https://pub-b95d920378084e198ac57eda9c035a3f.r2.dev',
   };
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { BookOpen, Sparkles, Award, Eye, Calendar, X } from 'lucide-react';
+import { Shimmer, DevotionTableSkeleton, DevotionDetailSkeleton } from './Shimmer';
 
 interface DevotionItem {
   id: string; // YYYY-MM-DD
@@ -92,25 +93,37 @@ export const DevotionsView: React.FC = () => {
               <span>AI DEVOTIONS</span>
             </div>
           </div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {loading ? '...' : devotions.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>devotions</span>
-          </div>
-          <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-            Generated daily via Gemini AI scheduler
-          </div>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, marginBottom: 4 }}>
+              <Shimmer width={160} height={36} borderRadius={8} />
+              <Shimmer width={210} height={14} borderRadius={6} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
+                {devotions.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>devotions</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                Generated daily via Gemini AI scheduler
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Devotions Table Card */}
       <div className="flat-card">
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 18 }}>
-          Devotion Archives ({devotions.length})
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Devotion Archives</span>
+          {loading ? (
+            <Shimmer width={38} height={18} borderRadius={6} />
+          ) : (
+            <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>({devotions.length})</span>
+          )}
         </h3>
 
         {loading ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748B', fontSize: 14 }}>
-            Loading devotions live from Firebase Firestore...
-          </div>
+          <DevotionTableSkeleton rows={6} />
         ) : devotions.length === 0 ? (
           <div style={{ 
             padding: '48px 24px', 
@@ -253,9 +266,7 @@ export const DevotionsView: React.FC = () => {
             </div>
 
             {loadingDetail ? (
-              <div style={{ padding: '30px 0', textAlign: 'center', color: '#64748B' }}>
-                Fetching reflection and prayer content...
-              </div>
+              <DevotionDetailSkeleton />
             ) : detail ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {detail.theme && (

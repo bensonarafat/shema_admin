@@ -12,6 +12,7 @@ import { PrayersView } from './components/PrayersView';
 import { LoginView } from './components/LoginView';
 import { auth, onAuthStateChanged, signOut, type User } from './config/firebase';
 import { subscribeToHymns, fetchHymnsFromFirestore } from './services/hymnService';
+import { AppLoadingSkeleton } from './components/Shimmer';
 import type { Hymn } from './types/hymn';
 
 export function App() {
@@ -76,16 +77,7 @@ export function App() {
   };
 
   if (authLoading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F6F8FA', gap: 14 }}>
-        <img 
-          src="/shema-icon.png" 
-          alt="Shema" 
-          style={{ width: 44, height: 44, objectFit: 'contain' }} 
-        />
-        <div style={{ color: '#64748B', fontWeight: 600, fontSize: 13 }}>Loading Shema Studio...</div>
-      </div>
-    );
+    return <AppLoadingSkeleton />;
   }
 
   // Pure Google OAuth Login (No Dev Mode button)

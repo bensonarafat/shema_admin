@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Search, Users, UserCheck, ShieldCheck, Mail } from 'lucide-react';
+import { Shimmer, UserTableSkeleton } from './Shimmer';
 
 interface UserRecord {
   id: string;
@@ -74,12 +75,21 @@ export const UsersView: React.FC = () => {
               <span>LIVE USERS</span>
             </div>
           </div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {loading ? '...' : users.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>registered</span>
-          </div>
-          <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-            {activeSubscribers} active subscribers
-          </div>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, marginBottom: 4 }}>
+              <Shimmer width={160} height={36} borderRadius={8} />
+              <Shimmer width={150} height={14} borderRadius={6} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
+                {users.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>registered</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                {activeSubscribers} active subscribers
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 16 }}>
@@ -87,7 +97,9 @@ export const UsersView: React.FC = () => {
             <UserCheck size={20} color="#5B4DFC" />
             <div>
               <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Active Subscriptions</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A' }}>{activeSubscribers}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 2 }}>
+                {loading ? <Shimmer width={28} height={18} borderRadius={4} /> : activeSubscribers}
+              </div>
             </div>
           </div>
         </div>
@@ -96,8 +108,13 @@ export const UsersView: React.FC = () => {
       {/* Users Table Card */}
       <div className="flat-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-            User Directory ({filteredUsers.length})
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>User Directory</span>
+            {loading ? (
+              <Shimmer width={38} height={18} borderRadius={6} />
+            ) : (
+              <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>({filteredUsers.length})</span>
+            )}
           </h3>
 
           <div style={{ position: 'relative', width: 280 }}>
@@ -113,9 +130,7 @@ export const UsersView: React.FC = () => {
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748B', fontSize: 14 }}>
-            Loading users live from Firebase Firestore...
-          </div>
+          <UserTableSkeleton rows={6} />
         ) : filteredUsers.length === 0 ? (
           <div style={{ 
             padding: '48px 24px', 

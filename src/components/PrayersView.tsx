@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Heart, MessageSquare, Search, User } from 'lucide-react';
+import { Shimmer, PrayerCardsSkeleton } from './Shimmer';
 
 interface PrayerRecord {
   id: string;
@@ -75,20 +76,34 @@ export const PrayersView: React.FC = () => {
               <span>LIVE PRAYERS</span>
             </div>
           </div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {loading ? '...' : prayers.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>requests</span>
-          </div>
-          <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-            {totalPrayersCount} community prayers lifted
-          </div>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, marginBottom: 4 }}>
+              <Shimmer width={160} height={36} borderRadius={8} />
+              <Shimmer width={190} height={14} borderRadius={6} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
+                {prayers.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>requests</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                {totalPrayersCount} community prayers lifted
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Prayers Table Card */}
       <div className="flat-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-            Prayer Wall ({filteredPrayers.length})
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>Prayer Wall</span>
+            {loading ? (
+              <Shimmer width={38} height={18} borderRadius={6} />
+            ) : (
+              <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>({filteredPrayers.length})</span>
+            )}
           </h3>
 
           <div style={{ position: 'relative', width: 280 }}>
@@ -104,9 +119,7 @@ export const PrayersView: React.FC = () => {
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748B', fontSize: 14 }}>
-            Loading prayers live from Firebase Firestore...
-          </div>
+          <PrayerCardsSkeleton count={4} />
         ) : filteredPrayers.length === 0 ? (
           <div style={{ 
             padding: '48px 24px', 

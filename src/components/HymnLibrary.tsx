@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Play, Pause, Music, Trash2, FileText, ExternalLink, Disc } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { deleteHymnFromFirestore } from '../services/hymnService';
+import { Shimmer, HymnTableSkeleton } from './Shimmer';
 
 interface HymnLibraryProps {
   hymns: Hymn[];
@@ -158,14 +159,17 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
 
       {/* Hymns Table Card */}
       <div className="flat-card">
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 18 }}>
-          Hymn Catalog ({filteredHymns.length})
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Hymn Catalog</span>
+          {loading ? (
+            <Shimmer width={38} height={18} borderRadius={6} />
+          ) : (
+            <span style={{ fontSize: 14, color: '#64748B', fontWeight: 600 }}>({filteredHymns.length})</span>
+          )}
         </h3>
 
         {loading ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748B', fontSize: 14 }}>
-            Loading hymns live from Firebase Firestore...
-          </div>
+          <HymnTableSkeleton rows={6} />
         ) : filteredHymns.length === 0 ? (
           <div style={{ 
             padding: '48px 24px', 

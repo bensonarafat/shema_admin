@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ArrowUpRight, Music, Play, CheckCircle, Disc, BookOpen, Heart, Users } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
+import { Shimmer, HymnTableSkeleton } from './Shimmer';
 
 interface HomeDashboardProps {
   hymns: Hymn[];
@@ -40,12 +41,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <span>LIVE FIREBASE</span>
             </div>
           </div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
-            {loading ? '...' : (publishedCount || hymns.length)} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>hymns</span>
-          </div>
-          <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-            {loading ? 'Syncing...' : `${totalStems} audio stems linked in Cloudflare R2`}
-          </div>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, marginBottom: 4 }}>
+              <Shimmer width={150} height={36} borderRadius={8} />
+              <Shimmer width={210} height={14} borderRadius={6} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 34, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.5px' }}>
+                {publishedCount || hymns.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>hymns</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                {totalStems} audio stems linked in Cloudflare R2
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 20 }}>
@@ -144,9 +154,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
 
         {loading ? (
-          <div style={{ padding: '36px 0', textAlign: 'center', color: '#64748B', fontSize: 14 }}>
-            Fetching hymns live from Firebase...
-          </div>
+          <HymnTableSkeleton rows={4} />
         ) : hymns.length === 0 ? (
           <div style={{ 
             padding: '48px 24px', 

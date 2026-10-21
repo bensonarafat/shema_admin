@@ -416,8 +416,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
-              <div style={{ height: 4, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ width: `${uploadProgress.cover}%`, height: '100%', backgroundColor: '#5B4DFC', transition: 'width 0.2s ease' }} />
+              <div style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
+                <div className="progress-shimmer" style={{ width: `${uploadProgress.cover}%`, height: '100%', backgroundColor: '#5B4DFC', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
           </div>
@@ -447,8 +447,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
-              <div style={{ height: 4, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ width: `${uploadProgress.vocal}%`, height: '100%', backgroundColor: '#4F46E5', transition: 'width 0.2s ease' }} />
+              <div style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
+                <div className="progress-shimmer" style={{ width: `${uploadProgress.vocal}%`, height: '100%', backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
           </div>
@@ -478,8 +478,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
-              <div style={{ height: 4, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ width: `${uploadProgress.instrumental}%`, height: '100%', backgroundColor: '#16A34A', transition: 'width 0.2s ease' }} />
+              <div style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
+                <div className="progress-shimmer" style={{ width: `${uploadProgress.instrumental}%`, height: '100%', backgroundColor: '#16A34A', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
           </div>
@@ -509,8 +509,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
-              <div style={{ height: 4, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ width: `${uploadProgress.congregation}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.2s ease' }} />
+              <div style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
+                <div className="progress-shimmer" style={{ width: `${uploadProgress.congregation}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
           </div>

@@ -255,11 +255,60 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 }}>
         {/* Left Column: Metadata & Details */}
         <div className="flat-card" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>1. Hymn Metadata</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>1. Item Type & Metadata</h3>
+
+          {/* Type Selector (sets isHymn boolean flag) */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#64748B', display: 'block', marginBottom: 8 }}>
+              Track Type (sets isHymn boolean for iOS App)
+            </label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setIsHymn(true)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  backgroundColor: isHymn ? '#5B4DFC' : '#F1F3F6',
+                  color: isHymn ? '#FFFFFF' : '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <span>Hymn (isHymn: true)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsHymn(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  backgroundColor: !isHymn ? '#5B4DFC' : '#F1F3F6',
+                  color: !isHymn ? '#FFFFFF' : '#64748B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <span>Psalm (isHymn: false)</span>
+              </button>
+            </div>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 14 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>Hymn #</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>
+                {isHymn ? 'Hymn #' : 'Psalm #'}
+              </label>
               <input 
                 type="number" 
                 value={number} 

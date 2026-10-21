@@ -18,6 +18,7 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'hymn' | 'psalm'>('all');
   const [activeStem, setActiveStem] = useState<{ id: string; stem: string; url: string } | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [viewingLyrics, setViewingLyrics] = useState<Hymn | null>(null);
@@ -29,7 +30,10 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                           (h.author && h.author.toLowerCase().includes(search.toLowerCase())) ||
                           h.number.toString().includes(search);
     const matchesCategory = selectedCategory === 'All' || h.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesType = typeFilter === 'all' || 
+                        (typeFilter === 'hymn' && h.isHymn !== false) ||
+                        (typeFilter === 'psalm' && h.isHymn === false);
+    return matchesSearch && matchesCategory && matchesType;
   });
 
   const togglePlayStem = (hymn: Hymn, stem: 'vocal' | 'instrumental' | 'congregation') => {
@@ -101,6 +105,49 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                 {cat}
               </button>
             ))}
+          </div>
+
+          {/* Type Filter: All vs Hymns vs Psalms */}
+          <div style={{ display: 'flex', gap: 6, backgroundColor: '#F8F9FB', padding: 4, borderRadius: 9999 }}>
+            <button
+              onClick={() => setTypeFilter('all')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 9999,
+                fontSize: 12,
+                fontWeight: 700,
+                backgroundColor: typeFilter === 'all' ? '#0F172A' : 'transparent',
+                color: typeFilter === 'all' ? '#FFFFFF' : '#64748B',
+              }}
+            >
+              All Tracks
+            </button>
+            <button
+              onClick={() => setTypeFilter('hymn')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 9999,
+                fontSize: 12,
+                fontWeight: 700,
+                backgroundColor: typeFilter === 'hymn' ? '#5B4DFC' : 'transparent',
+                color: typeFilter === 'hymn' ? '#FFFFFF' : '#64748B',
+              }}
+            >
+              Hymns (isHymn: true)
+            </button>
+            <button
+              onClick={() => setTypeFilter('psalm')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 9999,
+                fontSize: 12,
+                fontWeight: 700,
+                backgroundColor: typeFilter === 'psalm' ? '#5B4DFC' : 'transparent',
+                color: typeFilter === 'psalm' ? '#FFFFFF' : '#64748B',
+              }}
+            >
+              Psalms (isHymn: false)
+            </button>
           </div>
         </div>
 
@@ -190,7 +237,19 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                         </div>
                       )}
                       <div>
-                        <div style={{ fontWeight: 700, color: '#0F172A' }}>{hymn.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 700, color: '#0F172A' }}>{hymn.title}</span>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                            backgroundColor: hymn.isHymn !== false ? '#EEF2FF' : '#FAF5FF',
+                            color: hymn.isHymn !== false ? '#4F46E5' : '#9333EA',
+                          }}>
+                            {hymn.isHymn !== false ? 'Hymn' : 'Psalm'}
+                          </span>
+                        </div>
                         <div style={{ fontSize: 12, color: '#94A3B8' }}>{hymn.author || 'Traditional'}</div>
                       </div>
                     </div>

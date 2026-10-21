@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Play, Pause, Music, Trash2, FileText, ExternalLink, Disc } from 'lucide-react';
+import { Search, Play, Pause, Music, Trash2, FileText, ExternalLink, Disc, Pencil } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { deleteHymnFromFirestore } from '../services/hymnService';
 import { Shimmer, HymnTableSkeleton } from './Shimmer';
@@ -342,6 +342,22 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => navigate(`/edit/${hymn.id}`, { state: { hymn } })}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          backgroundColor: '#EEEDFE',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#5B4DFC'
+                        }}
+                        title="Edit hymn details & stems"
+                      >
+                        <Pencil size={14} />
+                      </button>
                       <a 
                         href={hymn.coverImageUrl} 
                         target="_blank" 
@@ -417,13 +433,27 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                 </h3>
                 <span style={{ fontSize: 12, color: '#64748B' }}>#{viewingLyrics.number} • {viewingLyrics.author}</span>
               </div>
-              <button 
-                onClick={() => setViewingLyrics(null)} 
-                className="btn-secondary"
-                style={{ padding: '6px 12px' }}
-              >
-                Close
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={() => {
+                    const hymnToEdit = viewingLyrics;
+                    setViewingLyrics(null);
+                    navigate(`/edit/${hymnToEdit.id}`, { state: { hymn: hymnToEdit } });
+                  }} 
+                  className="btn-primary"
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                >
+                  <Pencil size={13} />
+                  <span>Edit Track</span>
+                </button>
+                <button 
+                  onClick={() => setViewingLyrics(null)} 
+                  className="btn-secondary"
+                  style={{ padding: '6px 12px' }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             <div style={{ 

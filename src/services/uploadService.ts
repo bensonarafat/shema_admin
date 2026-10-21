@@ -51,7 +51,7 @@ export const uploadFileToR2 = async ({
   onProgress,
 }: UploadFileOptions): Promise<string> => {
   const client = createR2Client(config);
-  const key = `hymns/${folderSlug}/${filename}`;
+  const key = `${folderSlug}/${filename}`;
 
   const parallelUpload = new Upload({
     client,

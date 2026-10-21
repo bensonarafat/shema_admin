@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ArrowUpRight, Music, Play, CheckCircle, Disc, BookOpen, Heart, Users } from 'lucide-react';
+import { Plus, ArrowUpRight, Music, Play, CheckCircle, Disc, BookOpen, Heart, Users, Pencil } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { Shimmer, HymnTableSkeleton } from './Shimmer';
 
@@ -260,22 +260,40 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                     </span>
                   </td>
                   <td>
-                    <button 
-                      onClick={() => onPlayHymn(hymn)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        backgroundColor: '#F1F3F6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#0F172A',
-                      }}
-                      title="Play vocal stem"
-                    >
-                      <Play size={14} fill="#0F172A" />
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button 
+                        onClick={() => onPlayHymn(hymn)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          backgroundColor: '#F1F3F6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#0F172A',
+                        }}
+                        title="Play vocal stem"
+                      >
+                        <Play size={14} fill="#0F172A" />
+                      </button>
+                      <button 
+                        onClick={() => navigate(`/edit/${hymn.id}`, { state: { hymn } })}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          backgroundColor: '#EEEDFE',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#5B4DFC',
+                        }}
+                        title="Edit hymn"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

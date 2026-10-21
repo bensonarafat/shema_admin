@@ -114,6 +114,17 @@ export function App() {
               path="/upload" 
               element={
                 <UploadStudio 
+                  hymns={hymns}
+                  nextHymnNumber={hymns.length + 1}
+                />
+              } 
+            />
+
+            <Route 
+              path="/edit/:id" 
+              element={
+                <UploadStudio 
+                  hymns={hymns}
                   nextHymnNumber={hymns.length + 1}
                 />
               } 

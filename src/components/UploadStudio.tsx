@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   UploadCloud, 
   Music, 
@@ -7,36 +7,58 @@ import {
   Pause, 
   Check, 
   AlertCircle, 
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Link as LinkIcon,
+  Pencil
 } from 'lucide-react';
 import { slugify, detectAudioDuration, uploadFileToR2, uploadHymnMetadataJson } from '../services/uploadService';
 import { saveHymnToFirestore } from '../services/hymnService';
 import { getStoredR2Config } from '../config/r2';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { Hymn, UploadProgress } from '../types/hymn';
 
 interface UploadStudioProps {
+  hymns?: Hymn[];
   nextHymnNumber: number;
   onSuccess?: (hymn: Hymn) => void;
   onOpenR2Settings?: () => void;
 }
 
 export const UploadStudio: React.FC<UploadStudioProps> = ({ 
+  hymns = [],
   nextHymnNumber,
   onSuccess, 
   onOpenR2Settings 
 }) => {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [number, setNumber] = useState<number>(nextHymnNumber || 1);
-  const [author, setAuthor] = useState('');
-  const [category, setCategory] = useState('Grace & Mercy');
-  const [isHymn, setIsHymn] = useState<boolean>(true);
-  const [isDailyFeatured, setIsDailyFeatured] = useState(false);
-  const [lyricsFullText, setLyricsFullText] = useState('');
-  const [duration, setDuration] = useState<number>(0);
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id?: string }>();
 
-  // Files
+  // Determine if editing an existing hymn
+  const searchParams = new URLSearchParams(location.search);
+  const targetId = routeId || searchParams.get('id') || searchParams.get('edit') || (location.state as any)?.hymn?.id;
+  const hymnToEdit: Hymn | undefined = (location.state as any)?.hymn || hymns.find((h) => h.id === targetId);
+  const isEditing = Boolean(hymnToEdit);
+
+  // Form State
+  const [title, setTitle] = useState(hymnToEdit?.title || '');
+  const [number, setNumber] = useState<number>(hymnToEdit?.number ?? (nextHymnNumber || 1));
+  const [author, setAuthor] = useState(hymnToEdit?.author || '');
+  const [category, setCategory] = useState(hymnToEdit?.category || 'Grace & Mercy');
+  const [isHymn, setIsHymn] = useState<boolean>(hymnToEdit ? hymnToEdit.isHymn !== false : true);
+  const [isDailyFeatured, setIsDailyFeatured] = useState<boolean>(Boolean(hymnToEdit?.isDailyFeatured));
+  const [lyricsFullText, setLyricsFullText] = useState(hymnToEdit?.lyricsFullText || '');
+  const [duration, setDuration] = useState<number>(hymnToEdit?.duration || 0);
+
+  // Direct URLs (useful for existing hymns or manually uploaded files)
+  const [customCoverUrl, setCustomCoverUrl] = useState(hymnToEdit?.coverImageUrl || '');
+  const [customVocalUrl, setCustomVocalUrl] = useState(hymnToEdit?.vocalURL || '');
+  const [customInstrumentalUrl, setCustomInstrumentalUrl] = useState(hymnToEdit?.instrumentalURL || '');
+  const [customCongregationUrl, setCustomCongregationUrl] = useState(hymnToEdit?.congregationURL || '');
+  const [showDirectUrlEditor, setShowDirectUrlEditor] = useState(false);
+
+  // Local File Selections (for new uploads or replacements)
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [vocalFile, setVocalFile] = useState<File | null>(null);
   const [instrumentalFile, setInstrumentalFile] = useState<File | null>(null);
@@ -58,7 +80,28 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const folderSlug = slugify(title || 'untitled-hymn');
+  // When editing, folderSlug stays as existing hymn ID; when creating, derive from title
+  const folderSlug = isEditing && hymnToEdit?.id 
+    ? hymnToEdit.id 
+    : slugify(title || 'untitled-hymn');
+
+  // Sync if route changes or hymn loads
+  useEffect(() => {
+    if (hymnToEdit) {
+      setTitle(hymnToEdit.title || '');
+      setNumber(hymnToEdit.number ?? nextHymnNumber);
+      setAuthor(hymnToEdit.author || '');
+      setCategory(hymnToEdit.category || 'Grace & Mercy');
+      setIsHymn(hymnToEdit.isHymn !== false);
+      setIsDailyFeatured(Boolean(hymnToEdit.isDailyFeatured));
+      setLyricsFullText(hymnToEdit.lyricsFullText || '');
+      setDuration(hymnToEdit.duration || 0);
+      setCustomCoverUrl(hymnToEdit.coverImageUrl || '');
+      setCustomVocalUrl(hymnToEdit.vocalURL || '');
+      setCustomInstrumentalUrl(hymnToEdit.instrumentalURL || '');
+      setCustomCongregationUrl(hymnToEdit.congregationURL || '');
+    }
+  }, [hymnToEdit?.id]);
 
   // Handle Audio File Selection with auto-duration detection
   const handleVocalFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,9 +115,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
     }
   };
 
-  const playPreview = (file: File | null, stemName: string) => {
-    if (!file) return;
-
+  const playPreview = (file: File | null, existingUrl: string | undefined, stemName: string) => {
     if (playingStem === stemName && audioPlayerRef.current) {
       audioPlayerRef.current.pause();
       setPlayingStem(null);
@@ -85,15 +126,28 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
       audioPlayerRef.current.pause();
     }
 
-    const url = URL.createObjectURL(file);
-    const audio = new Audio(url);
+    let urlToPlay: string | null = null;
+    let isBlob = false;
+
+    if (file) {
+      urlToPlay = URL.createObjectURL(file);
+      isBlob = true;
+    } else if (existingUrl) {
+      urlToPlay = existingUrl;
+    }
+
+    if (!urlToPlay) return;
+
+    const audio = new Audio(urlToPlay);
     audioPlayerRef.current = audio;
-    audio.play();
+    audio.play().catch((err) => console.warn('Audio preview playback error:', err));
     setPlayingStem(stemName);
 
     audio.onended = () => {
       setPlayingStem(null);
-      URL.revokeObjectURL(url);
+      if (isBlob && urlToPlay) {
+        URL.revokeObjectURL(urlToPlay);
+      }
     };
   };
 
@@ -108,25 +162,31 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
     }
 
     const r2Config = getStoredR2Config();
-    if (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey) {
-      setErrorMessage('Cloudflare R2 credentials are required. Please configure your Account ID and Access Keys.');
+    const domain = r2Config.publicDomain.replace(/\/+$/, '');
+
+    // Default URLs directly inside the bucket under folderSlug (NO 'hymns/' prefix)
+    let coverImageUrl = customCoverUrl || `${domain}/${folderSlug}/cover.jpg`;
+    let vocalURL = customVocalUrl || `${domain}/${folderSlug}/vocal.mp3`;
+    let instrumentalURL = customInstrumentalUrl || `${domain}/${folderSlug}/instrumental.mp3`;
+    let congregationURL = customCongregationUrl || `${domain}/${folderSlug}/congregation.mp3`;
+
+    // Check if new uploads are pending
+    const hasFilesToUpload = Boolean(coverFile || vocalFile || instrumentalFile || congregationFile);
+
+    if (hasFilesToUpload && (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey)) {
+      setErrorMessage('Cloudflare R2 credentials are required to upload new files. Please configure your Account ID and Access Keys in Settings.');
       if (onOpenR2Settings) onOpenR2Settings();
       else navigate('/settings');
       return;
     }
 
     setIsUploading(true);
-    setStatusMessage(`Uploading assets to Cloudflare R2: hymns/${folderSlug}/...`);
+    setStatusMessage(`Syncing assets to Cloudflare R2: ${folderSlug}/...`);
 
     try {
-      let coverImageUrl = `${r2Config.publicDomain.replace(/\/+$/, '')}/hymns/${folderSlug}/cover.jpg`;
-      let vocalURL = `${r2Config.publicDomain.replace(/\/+$/, '')}/hymns/${folderSlug}/vocal.mp3`;
-      let instrumentalURL = `${r2Config.publicDomain.replace(/\/+$/, '')}/hymns/${folderSlug}/instrumental.mp3`;
-      let congregationURL = `${r2Config.publicDomain.replace(/\/+$/, '')}/hymns/${folderSlug}/congregation.mp3`;
-
       // 1. Upload Cover / Background
       if (coverFile) {
-        setStatusMessage('Uploading cover background...');
+        setStatusMessage('Uploading cover background to Cloudflare R2...');
         const ext = coverFile.name.split('.').pop() || 'jpg';
         coverImageUrl = await uploadFileToR2({
           config: r2Config,
@@ -140,7 +200,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
 
       // 2. Upload Vocal
       if (vocalFile) {
-        setStatusMessage('Uploading Lead Vocal stem...');
+        setStatusMessage('Uploading Lead Vocal stem to Cloudflare R2...');
         vocalURL = await uploadFileToR2({
           config: r2Config,
           folderSlug,
@@ -153,7 +213,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
 
       // 3. Upload Instrumental
       if (instrumentalFile) {
-        setStatusMessage('Uploading Instrumental backing stem...');
+        setStatusMessage('Uploading Instrumental backing stem to Cloudflare R2...');
         instrumentalURL = await uploadFileToR2({
           config: r2Config,
           folderSlug,
@@ -166,7 +226,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
 
       // 4. Upload Congregation
       if (congregationFile) {
-        setStatusMessage('Uploading Choir / Congregation stem...');
+        setStatusMessage('Uploading Choir / Congregation stem to Cloudflare R2...');
         congregationURL = await uploadFileToR2({
           config: r2Config,
           folderSlug,
@@ -193,18 +253,25 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         congregationURL,
         lyricsFullText: lyricsFullText.trim(),
         status: 'published',
+        createdAt: hymnToEdit?.createdAt || new Date().toISOString(),
       };
 
-      // 6. Upload metadata.json to R2
-      setStatusMessage('Saving metadata.json to Cloudflare R2 folder...');
-      await uploadHymnMetadataJson(r2Config, folderSlug, hymnRecord);
-      setUploadProgress((prev) => ({ ...prev, metadata: 100 }));
+      // 6. Upload metadata.json to R2 if credentials present
+      if (r2Config.accountId && r2Config.accessKeyId && r2Config.secretAccessKey) {
+        try {
+          setStatusMessage('Saving metadata.json to Cloudflare R2 folder...');
+          await uploadHymnMetadataJson(r2Config, folderSlug, hymnRecord);
+          setUploadProgress((prev) => ({ ...prev, metadata: 100 }));
+        } catch (r2Err: any) {
+          console.warn('Metadata upload warning:', r2Err);
+        }
+      }
 
       // 7. Write directly to Firestore hymns collection
       setStatusMessage('Syncing live with Firebase Firestore...');
       await saveHymnToFirestore(hymnRecord);
 
-      setStatusMessage('Published successfully!');
+      setStatusMessage(isEditing ? 'Hymn updated successfully!' : 'Published successfully!');
       if (onSuccess) onSuccess(hymnRecord);
       navigate('/library');
     } catch (err: any) {
@@ -219,22 +286,65 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
     <form onSubmit={handlePublish} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Title Header Card */}
       <div className="flat-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
-            Hymn Upload Studio
-          </h2>
-          <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-            Directly uploads files into Cloudflare R2 folder: <code style={{ backgroundColor: '#F1F3F6', padding: '2px 8px', borderRadius: 6, fontWeight: 700, color: '#5B4DFC' }}>hymns/{folderSlug}/</code>
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => navigate('/library')}
+              className="btn-secondary"
+              style={{ padding: '8px 12px' }}
+              title="Back to Hymn Library"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>
+                {isEditing ? `Edit Track: ${hymnToEdit?.title}` : 'Hymn Upload Studio'}
+              </h2>
+              {isEditing ? (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  backgroundColor: '#EEEDFE',
+                  color: '#5B4DFC',
+                  padding: '3px 10px',
+                  borderRadius: 9999,
+                  letterSpacing: 0.5,
+                }}>
+                  EDIT MODE (#{hymnToEdit?.number || number})
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  backgroundColor: '#ECFDF5',
+                  color: '#059669',
+                  padding: '3px 10px',
+                  borderRadius: 9999,
+                  letterSpacing: 0.5,
+                }}>
+                  NEW TRACK
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+              Directly uploads files into Cloudflare R2 folder: <code style={{ backgroundColor: '#F1F3F6', padding: '2px 8px', borderRadius: 6, fontWeight: 700, color: '#5B4DFC' }}>{folderSlug}/</code>
+            </p>
+          </div>
         </div>
 
-        <button 
-          type="button" 
-          onClick={() => onOpenR2Settings ? onOpenR2Settings() : navigate('/settings')}
-          className="btn-secondary"
-        >
-          Settings
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button 
+            type="button" 
+            onClick={() => onOpenR2Settings ? onOpenR2Settings() : navigate('/settings')}
+            className="btn-secondary"
+          >
+            Settings
+          </button>
+        </div>
       </div>
 
       {errorMessage && (
@@ -316,10 +426,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               />
             </div>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>Hymn Title</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>Track Title</label>
               <input 
                 type="text" 
-                placeholder="e.g. Amazing Grace" 
+                placeholder="e.g. All Creatures of Our God and King" 
                 value={title} 
                 onChange={(e) => setTitle(e.target.value)} 
                 required 
@@ -333,7 +443,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               <label style={{ fontSize: 12, fontWeight: 600, color: '#64748B', display: 'block', marginBottom: 6 }}>Author / Composer</label>
               <input 
                 type="text" 
-                placeholder="e.g. John Newton" 
+                placeholder="e.g. St. Francis of Assisi" 
                 value={author} 
                 onChange={(e) => setAuthor(e.target.value)} 
                 style={{ width: '100%' }}
@@ -362,7 +472,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               <input 
                 type="number" 
                 step="0.1"
-                placeholder="Auto-detected from vocal track"
+                placeholder="Auto-detected or enter seconds"
                 value={duration || ''} 
                 onChange={(e) => setDuration(Number(e.target.value))} 
                 style={{ width: '100%' }}
@@ -388,7 +498,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               CLOUDFLARE R2 DESTINATION DIRECTORY
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#5B4DFC' }}>
-              hymns/{folderSlug}/
+              {folderSlug}/
             </div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
               Files: cover.jpg, vocal.mp3, instrumental.mp3, congregation.mp3, metadata.json
@@ -398,7 +508,18 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
 
         {/* Right Column: 4 Asset Dropzones */}
         <div className="flat-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>2. Audio Stems & Background</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>2. Audio Stems & Background</h3>
+            <button
+              type="button"
+              onClick={() => setShowDirectUrlEditor(!showDirectUrlEditor)}
+              className="btn-secondary"
+              style={{ padding: '4px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <LinkIcon size={12} />
+              <span>{showDirectUrlEditor ? 'Hide Direct URLs' : 'Direct URLs'}</span>
+            </button>
+          </div>
 
           {/* Slot 1: Cover Artwork / Background */}
           <div style={{ backgroundColor: '#F8F9FB', padding: 14, borderRadius: 12 }}>
@@ -407,8 +528,28 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <ImageIcon size={16} color="#64748B" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Background / Cover</span>
               </div>
-              <span style={{ fontSize: 11, color: '#94A3B8' }}>cover.jpg / cover.mp4</span>
+              {(customCoverUrl || coverFile) && (
+                <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>
+                  {coverFile ? 'New file selected' : 'Cover Linked'}
+                </span>
+              )}
             </div>
+
+            {/* Thumbnail Preview if already linked */}
+            {customCoverUrl && !coverFile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, padding: 6, backgroundColor: '#FFFFFF', borderRadius: 8 }}>
+                <img 
+                  src={customCoverUrl} 
+                  alt="Cover Preview" 
+                  style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: '#64748B' }}>
+                  {customCoverUrl.split('/').pop()}
+                </div>
+              </div>
+            )}
+
             <input 
               type="file" 
               accept="image/*,video/mp4" 
@@ -420,6 +561,15 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <div className="progress-shimmer" style={{ width: `${uploadProgress.cover}%`, height: '100%', backgroundColor: '#5B4DFC', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
+            {showDirectUrlEditor && (
+              <input
+                type="text"
+                placeholder="Or paste direct Cloudflare R2 cover URL"
+                value={customCoverUrl}
+                onChange={(e) => setCustomCoverUrl(e.target.value)}
+                style={{ width: '100%', fontSize: 11, marginTop: 6 }}
+              />
+            )}
           </div>
 
           {/* Slot 2: Vocal Stem */}
@@ -429,10 +579,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#4F46E5" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Lead Vocal Stem</span>
               </div>
-              {vocalFile && (
+              {(vocalFile || customVocalUrl) && (
                 <button
                   type="button"
-                  onClick={() => playPreview(vocalFile, 'vocal')}
+                  onClick={() => playPreview(vocalFile, customVocalUrl, 'vocal')}
                   style={{ background: '#EEF2FF', color: '#4F46E5', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   {playingStem === 'vocal' ? <Pause size={12} /> : <Play size={12} />}
@@ -451,6 +601,15 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <div className="progress-shimmer" style={{ width: `${uploadProgress.vocal}%`, height: '100%', backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
+            {showDirectUrlEditor && (
+              <input
+                type="text"
+                placeholder="Or paste direct vocal.mp3 URL"
+                value={customVocalUrl}
+                onChange={(e) => setCustomVocalUrl(e.target.value)}
+                style={{ width: '100%', fontSize: 11, marginTop: 6 }}
+              />
+            )}
           </div>
 
           {/* Slot 3: Instrumental Stem */}
@@ -460,10 +619,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#16A34A" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Instrumental Backing</span>
               </div>
-              {instrumentalFile && (
+              {(instrumentalFile || customInstrumentalUrl) && (
                 <button
                   type="button"
-                  onClick={() => playPreview(instrumentalFile, 'instrumental')}
+                  onClick={() => playPreview(instrumentalFile, customInstrumentalUrl, 'instrumental')}
                   style={{ background: '#F0FDF4', color: '#16A34A', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   {playingStem === 'instrumental' ? <Pause size={12} /> : <Play size={12} />}
@@ -482,6 +641,15 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <div className="progress-shimmer" style={{ width: `${uploadProgress.instrumental}%`, height: '100%', backgroundColor: '#16A34A', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
             )}
+            {showDirectUrlEditor && (
+              <input
+                type="text"
+                placeholder="Or paste direct instrumental.mp3 URL"
+                value={customInstrumentalUrl}
+                onChange={(e) => setCustomInstrumentalUrl(e.target.value)}
+                style={{ width: '100%', fontSize: 11, marginTop: 6 }}
+              />
+            )}
           </div>
 
           {/* Slot 4: Congregation Choir Stem */}
@@ -491,10 +659,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#9333EA" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Congregation / Choir</span>
               </div>
-              {congregationFile && (
+              {(congregationFile || customCongregationUrl) && (
                 <button
                   type="button"
-                  onClick={() => playPreview(congregationFile, 'congregation')}
+                  onClick={() => playPreview(congregationFile, customCongregationUrl, 'congregation')}
                   style={{ background: '#FAF5FF', color: '#9333EA', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
                 >
                   {playingStem === 'congregation' ? <Pause size={12} /> : <Play size={12} />}
@@ -512,6 +680,15 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               <div style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 9999, marginTop: 8, overflow: 'hidden' }}>
                 <div className="progress-shimmer" style={{ width: `${uploadProgress.congregation}%`, height: '100%', backgroundColor: '#9333EA', transition: 'width 0.2s ease', borderRadius: 9999 }} />
               </div>
+            )}
+            {showDirectUrlEditor && (
+              <input
+                type="text"
+                placeholder="Or paste direct congregation.mp3 URL"
+                value={customCongregationUrl}
+                onChange={(e) => setCustomCongregationUrl(e.target.value)}
+                style={{ width: '100%', fontSize: 11, marginTop: 6 }}
+              />
             )}
           </div>
         </div>
@@ -556,21 +733,38 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
           rows={12}
           value={lyricsFullText}
           onChange={(e) => setLyricsFullText(e.target.value)}
-          placeholder={`Verse 1\nO Lord my God\nWhen I in awesome wonder\n...\n\nChorus\nThen sings my soul,\nMy Savior God, to Thee;\n...`}
+          placeholder={`Verse 1\nAll creatures of our God and King\nLift up your voice and with us sing,\nAlleluia! Alleluia!\n...\n\nChorus\nO praise Him! O praise Him!\nAlleluia! Alleluia! Alleluia!`}
           style={{ width: '100%', lineHeight: 1.6, fontSize: 14, fontFamily: 'monospace' }}
         />
       </div>
 
       {/* Action Submit Button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, paddingBottom: 24 }}>
+        {isEditing && (
+          <button
+            type="button"
+            onClick={() => navigate('/library')}
+            className="btn-secondary"
+            style={{ padding: '14px 24px', fontSize: 15 }}
+          >
+            Cancel
+          </button>
+        )}
+
         <button
           type="submit"
           disabled={isUploading}
           className="btn-primary"
           style={{ padding: '14px 32px', fontSize: 15 }}
         >
-          <UploadCloud size={20} />
-          <span>{isUploading ? 'Uploading to Cloudflare R2...' : 'Publish to Cloudflare & Firestore'}</span>
+          {isEditing ? <Pencil size={18} /> : <UploadCloud size={20} />}
+          <span>
+            {isUploading 
+              ? 'Saving to Cloudflare & Firestore...' 
+              : isEditing 
+                ? 'Save Changes to Firestore & R2' 
+                : 'Publish to Cloudflare & Firestore'}
+          </span>
           <ArrowRight size={18} />
         </button>
       </div>

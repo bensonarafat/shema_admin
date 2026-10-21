@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ArrowUpRight, Music, Play, CheckCircle, Disc, BookOpen, Heart, Users, Pencil } from 'lucide-react';
+import { Plus, ArrowUpRight, Play, CheckCircle, Disc, BookOpen, Heart, Users, Pencil } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { Shimmer, HymnTableSkeleton } from './Shimmer';
+import { DEFAULT_HYMN_COVER_URL } from './UploadStudio';
 
 interface HomeDashboardProps {
   hymns: Hymn[];
@@ -17,7 +18,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 }) => {
   const navigate = useNavigate();
   const publishedCount = hymns.filter((h) => h.status !== 'draft').length;
-  const totalStems = hymns.length * 3;
+  const totalStems = hymns.reduce(
+    (acc, h) => acc + (h.vocalURL ? 1 : 0) + (h.instrumentalURL ? 1 : 0) + (h.congregationURL ? 1 : 0),
+    0
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -211,20 +215,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   <td style={{ fontWeight: 700, color: '#64748B' }}>#{hymn.number}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {hymn.coverImageUrl ? (
-                        <img 
-                          src={hymn.coverImageUrl} 
-                          alt={hymn.title} 
-                          style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#F1F3F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Music size={16} color="#64748B" />
-                        </div>
-                      )}
+                      <img 
+                        src={hymn.coverImageUrl || DEFAULT_HYMN_COVER_URL} 
+                        alt={hymn.title} 
+                        style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_HYMN_COVER_URL;
+                        }}
+                      />
                       <div>
                         <div style={{ fontWeight: 700, color: '#0F172A' }}>{hymn.title}</div>
                         <div style={{ fontSize: 11, color: '#94A3B8' }}>{hymn.author || 'Traditional'}</div>
@@ -248,9 +246,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#EEF2FF', color: '#4F46E5', fontWeight: 600 }}>Vocal</span>
-                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#F0FDF4', color: '#16A34A', fontWeight: 600 }}>Inst</span>
-                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#FAF5FF', color: '#9333EA', fontWeight: 600 }}>Choir</span>
+                      {hymn.vocalURL && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#EEF2FF', color: '#4F46E5', fontWeight: 600 }}>Vocal</span>}
+                      {hymn.instrumentalURL && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#F0FDF4', color: '#16A34A', fontWeight: 600 }}>Inst</span>}
+                      {hymn.congregationURL && <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, backgroundColor: '#FAF5FF', color: '#9333EA', fontWeight: 600 }}>Choir</span>}
+                      {!hymn.vocalURL && !hymn.instrumentalURL && !hymn.congregationURL && <span style={{ fontSize: 11, color: '#94A3B8' }}>-</span>}
                     </div>
                   </td>
                   <td>

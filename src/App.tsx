@@ -67,8 +67,9 @@ export function App() {
     if (playingAudio) {
       playingAudio.pause();
     }
-    if (hymn.vocalURL) {
-      const audio = new Audio(hymn.vocalURL);
+    const audioUrl = hymn.vocalURL || hymn.instrumentalURL || hymn.congregationURL;
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
       audio.play().catch((err) => {
         console.error('Audio playback error:', err);
       });

@@ -10,13 +10,16 @@ import {
   ArrowRight,
   ArrowLeft,
   Link as LinkIcon,
-  Pencil
+  Pencil,
+  X
 } from 'lucide-react';
 import { slugify, detectAudioDuration, uploadFileToR2, uploadHymnMetadataJson } from '../services/uploadService';
 import { saveHymnToFirestore } from '../services/hymnService';
 import { getStoredR2Config } from '../config/r2';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { Hymn, UploadProgress } from '../types/hymn';
+
+export const DEFAULT_HYMN_COVER_URL = 'https://pub-6d749a684fb748e19b7695baf6f32de1.r2.dev/default-hymn-bg.jpeg';
 
 interface UploadStudioProps {
   hymns?: Hymn[];
@@ -51,7 +54,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
   const [lyricsFullText, setLyricsFullText] = useState(hymnToEdit?.lyricsFullText || '');
   const [duration, setDuration] = useState<number>(hymnToEdit?.duration || 0);
 
-  // Direct URLs (useful for existing hymns or manually uploaded files)
+  // Direct URLs (empty string represents null)
   const [customCoverUrl, setCustomCoverUrl] = useState(hymnToEdit?.coverImageUrl || '');
   const [customVocalUrl, setCustomVocalUrl] = useState(hymnToEdit?.vocalURL || '');
   const [customInstrumentalUrl, setCustomInstrumentalUrl] = useState(hymnToEdit?.instrumentalURL || '');
@@ -103,13 +106,15 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
     }
   }, [hymnToEdit?.id]);
 
-  // Handle Audio File Selection with auto-duration detection
-  const handleVocalFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Handle Audio File Selection with auto-duration detection from any uploaded stem
+  const handleAudioFileSelection = async (
+    file: File | null,
+    setFile: (f: File | null) => void
+  ) => {
+    setFile(file);
     if (file) {
-      setVocalFile(file);
       const detected = await detectAudioDuration(file);
-      if (detected > 0) {
+      if (detected > 0 && (!duration || duration === 0)) {
         setDuration(detected);
       }
     }
@@ -161,19 +166,20 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
       return;
     }
 
+    // Validation: At least one audio must be provided (either by file or existing/custom URL)
+    const hasVocal = Boolean(vocalFile || customVocalUrl.trim());
+    const hasInstrumental = Boolean(instrumentalFile || customInstrumentalUrl.trim());
+    const hasCongregation = Boolean(congregationFile || customCongregationUrl.trim());
+
+    if (!hasVocal && !hasInstrumental && !hasCongregation) {
+      setErrorMessage('At least one audio stem (Lead Vocal, Instrumental, or Choir) must be uploaded.');
+      return;
+    }
+
     const r2Config = getStoredR2Config();
-    const domain = r2Config.publicDomain.replace(/\/+$/, '');
+    const hasNewUploads = Boolean(coverFile || vocalFile || instrumentalFile || congregationFile);
 
-    // Default URLs directly inside the bucket under folderSlug (NO 'hymns/' prefix)
-    let coverImageUrl = customCoverUrl || `${domain}/${folderSlug}/cover.jpg`;
-    let vocalURL = customVocalUrl || `${domain}/${folderSlug}/vocal.mp3`;
-    let instrumentalURL = customInstrumentalUrl || `${domain}/${folderSlug}/instrumental.mp3`;
-    let congregationURL = customCongregationUrl || `${domain}/${folderSlug}/congregation.mp3`;
-
-    // Check if new uploads are pending
-    const hasFilesToUpload = Boolean(coverFile || vocalFile || instrumentalFile || congregationFile);
-
-    if (hasFilesToUpload && (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey)) {
+    if (hasNewUploads && (!r2Config.accountId || !r2Config.accessKeyId || !r2Config.secretAccessKey)) {
       setErrorMessage('Cloudflare R2 credentials are required to upload new files. Please configure your Account ID and Access Keys in Settings.');
       if (onOpenR2Settings) onOpenR2Settings();
       else navigate('/settings');
@@ -184,7 +190,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
     setStatusMessage(`Syncing assets to Cloudflare R2: ${folderSlug}/...`);
 
     try {
-      // 1. Upload Cover / Background
+      // 1. Cover URL: if coverFile uploaded, upload to R2; else if customCoverUrl, use it; else fallback to default cover
+      let coverImageUrl: string = customCoverUrl.trim() || DEFAULT_HYMN_COVER_URL;
       if (coverFile) {
         setStatusMessage('Uploading cover background to Cloudflare R2...');
         const ext = coverFile.name.split('.').pop() || 'jpg';
@@ -198,7 +205,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         });
       }
 
-      // 2. Upload Vocal
+      // 2. Vocal URL: if vocalFile uploaded, upload to R2; else if custom URL, use it; else null
+      let vocalURL: string | null = customVocalUrl.trim() || null;
       if (vocalFile) {
         setStatusMessage('Uploading Lead Vocal stem to Cloudflare R2...');
         vocalURL = await uploadFileToR2({
@@ -211,7 +219,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         });
       }
 
-      // 3. Upload Instrumental
+      // 3. Instrumental URL: if instrumentalFile uploaded, upload to R2; else if custom URL, use it; else null
+      let instrumentalURL: string | null = customInstrumentalUrl.trim() || null;
       if (instrumentalFile) {
         setStatusMessage('Uploading Instrumental backing stem to Cloudflare R2...');
         instrumentalURL = await uploadFileToR2({
@@ -224,7 +233,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         });
       }
 
-      // 4. Upload Congregation
+      // 4. Congregation URL: if congregationFile uploaded, upload to R2; else if custom URL, use it; else null
+      let congregationURL: string | null = customCongregationUrl.trim() || null;
       if (congregationFile) {
         setStatusMessage('Uploading Choir / Congregation stem to Cloudflare R2...');
         congregationURL = await uploadFileToR2({
@@ -281,6 +291,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
       setIsUploading(false);
     }
   };
+
+  const activeCoverPreview = coverFile 
+    ? URL.createObjectURL(coverFile) 
+    : (customCoverUrl.trim() || DEFAULT_HYMN_COVER_URL);
 
   return (
     <form onSubmit={handlePublish} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -472,7 +486,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               <input 
                 type="number" 
                 step="0.1"
-                placeholder="Auto-detected or enter seconds"
+                placeholder="Auto-detected from audio track"
                 value={duration || ''} 
                 onChange={(e) => setDuration(Number(e.target.value))} 
                 style={{ width: '100%' }}
@@ -501,7 +515,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
               {folderSlug}/
             </div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-              Files: cover.jpg, vocal.mp3, instrumental.mp3, congregation.mp3, metadata.json
+              Active stems will be uploaded directly under this directory.
             </div>
           </div>
         </div>
@@ -509,7 +523,12 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         {/* Right Column: 4 Asset Dropzones */}
         <div className="flat-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>2. Audio Stems & Background</h3>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>2. Audio Stems & Background</h3>
+              <p style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                At least one audio stem required. Unselected stems will be saved as <code style={{ color: '#5B4DFC', fontWeight: 700 }}>null</code>.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setShowDirectUrlEditor(!showDirectUrlEditor)}
@@ -528,27 +547,46 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <ImageIcon size={16} color="#64748B" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Background / Cover</span>
               </div>
-              {(customCoverUrl || coverFile) && (
-                <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>
-                  {coverFile ? 'New file selected' : 'Cover Linked'}
-                </span>
-              )}
+              <span style={{ 
+                fontSize: 11, 
+                fontWeight: 700, 
+                color: (coverFile || customCoverUrl.trim()) ? '#059669' : '#64748B' 
+              }}>
+                {coverFile 
+                  ? 'New file selected' 
+                  : customCoverUrl.trim() 
+                    ? 'Custom Cover' 
+                    : 'Default Shema Cover'}
+              </span>
             </div>
 
-            {/* Thumbnail Preview if already linked */}
-            {customCoverUrl && !coverFile && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, padding: 6, backgroundColor: '#FFFFFF', borderRadius: 8 }}>
-                <img 
-                  src={customCoverUrl} 
-                  alt="Cover Preview" 
-                  style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                />
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: '#64748B' }}>
-                  {customCoverUrl.split('/').pop()}
+            {/* Thumbnail Preview */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, padding: 6, backgroundColor: '#FFFFFF', borderRadius: 8 }}>
+              <img 
+                src={activeCoverPreview} 
+                alt="Cover Preview" 
+                style={{ width: 42, height: 42, borderRadius: 6, objectFit: 'cover' }}
+                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {coverFile ? coverFile.name : (customCoverUrl.trim() ? customCoverUrl.split('/').pop() : 'default-hymn-bg.jpeg')}
+                </div>
+                <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                  {!coverFile && !customCoverUrl.trim() ? 'Using default background image' : 'Custom image'}
                 </div>
               </div>
-            )}
+              {customCoverUrl && (
+                <button
+                  type="button"
+                  onClick={() => setCustomCoverUrl('')}
+                  style={{ background: 'transparent', color: '#94A3B8', padding: 4 }}
+                  title="Reset to default cover"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
             <input 
               type="file" 
@@ -579,21 +617,35 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#4F46E5" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Lead Vocal Stem</span>
               </div>
-              {(vocalFile || customVocalUrl) && (
-                <button
-                  type="button"
-                  onClick={() => playPreview(vocalFile, customVocalUrl, 'vocal')}
-                  style={{ background: '#EEF2FF', color: '#4F46E5', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  {playingStem === 'vocal' ? <Pause size={12} /> : <Play size={12} />}
-                  <span>{playingStem === 'vocal' ? 'Pause' : 'Preview'}</span>
-                </button>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {(vocalFile || customVocalUrl) ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => playPreview(vocalFile, customVocalUrl, 'vocal')}
+                      style={{ background: '#EEF2FF', color: '#4F46E5', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {playingStem === 'vocal' ? <Pause size={12} /> : <Play size={12} />}
+                      <span>{playingStem === 'vocal' ? 'Pause' : 'Preview'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setVocalFile(null); setCustomVocalUrl(''); }}
+                      style={{ background: 'transparent', color: '#94A3B8', padding: 4 }}
+                      title="Clear stem (set to null)"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>None (null)</span>
+                )}
+              </div>
             </div>
             <input 
               type="file" 
               accept="audio/*" 
-              onChange={handleVocalFileChange}
+              onChange={(e) => handleAudioFileSelection(e.target.files?.[0] || null, setVocalFile)}
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
@@ -619,21 +671,35 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#16A34A" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Instrumental Backing</span>
               </div>
-              {(instrumentalFile || customInstrumentalUrl) && (
-                <button
-                  type="button"
-                  onClick={() => playPreview(instrumentalFile, customInstrumentalUrl, 'instrumental')}
-                  style={{ background: '#F0FDF4', color: '#16A34A', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  {playingStem === 'instrumental' ? <Pause size={12} /> : <Play size={12} />}
-                  <span>{playingStem === 'instrumental' ? 'Pause' : 'Preview'}</span>
-                </button>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {(instrumentalFile || customInstrumentalUrl) ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => playPreview(instrumentalFile, customInstrumentalUrl, 'instrumental')}
+                      style={{ background: '#F0FDF4', color: '#16A34A', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {playingStem === 'instrumental' ? <Pause size={12} /> : <Play size={12} />}
+                      <span>{playingStem === 'instrumental' ? 'Pause' : 'Preview'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setInstrumentalFile(null); setCustomInstrumentalUrl(''); }}
+                      style={{ background: 'transparent', color: '#94A3B8', padding: 4 }}
+                      title="Clear stem (set to null)"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>None (null)</span>
+                )}
+              </div>
             </div>
             <input 
               type="file" 
               accept="audio/*" 
-              onChange={(e) => setInstrumentalFile(e.target.files?.[0] || null)}
+              onChange={(e) => handleAudioFileSelection(e.target.files?.[0] || null, setInstrumentalFile)}
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (
@@ -659,21 +725,35 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 <Music size={16} color="#9333EA" />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Congregation / Choir</span>
               </div>
-              {(congregationFile || customCongregationUrl) && (
-                <button
-                  type="button"
-                  onClick={() => playPreview(congregationFile, customCongregationUrl, 'congregation')}
-                  style={{ background: '#FAF5FF', color: '#9333EA', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  {playingStem === 'congregation' ? <Pause size={12} /> : <Play size={12} />}
-                  <span>{playingStem === 'congregation' ? 'Pause' : 'Preview'}</span>
-                </button>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {(congregationFile || customCongregationUrl) ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => playPreview(congregationFile, customCongregationUrl, 'congregation')}
+                      style={{ background: '#FAF5FF', color: '#9333EA', borderRadius: 9999, padding: '4px 10px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {playingStem === 'congregation' ? <Pause size={12} /> : <Play size={12} />}
+                      <span>{playingStem === 'congregation' ? 'Pause' : 'Preview'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setCongregationFile(null); setCustomCongregationUrl(''); }}
+                      style={{ background: 'transparent', color: '#94A3B8', padding: 4 }}
+                      title="Clear stem (set to null)"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>None (null)</span>
+                )}
+              </div>
             </div>
             <input 
               type="file" 
               accept="audio/*" 
-              onChange={(e) => setCongregationFile(e.target.files?.[0] || null)}
+              onChange={(e) => handleAudioFileSelection(e.target.files?.[0] || null, setCongregationFile)}
               style={{ width: '100%', fontSize: 12 }}
             />
             {isUploading && (

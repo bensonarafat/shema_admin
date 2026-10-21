@@ -7,10 +7,10 @@ export interface Hymn {
   duration: number; // in seconds
   isHymn: boolean; // true for Hymns, false for Psalms (CRITICAL for iOS app queries)
   isDailyFeatured: boolean;
-  coverImageUrl: string;
-  vocalURL: string;
-  instrumentalURL: string;
-  congregationURL: string;
+  coverImageUrl?: string | null;
+  vocalURL?: string | null;
+  instrumentalURL?: string | null;
+  congregationURL?: string | null;
   lyricsFullText: string;
   createdAt?: string;
   updatedAt?: string;

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Play, Pause, Music, Trash2, FileText, ExternalLink, Disc, Pencil } from 'lucide-react';
+import { Search, Play, Pause, Trash2, FileText, ExternalLink, Disc, Pencil } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { deleteHymnFromFirestore } from '../services/hymnService';
 import { Shimmer, HymnTableSkeleton } from './Shimmer';
+import { DEFAULT_HYMN_COVER_URL } from './UploadStudio';
 
 interface HymnLibraryProps {
   hymns: Hymn[];
@@ -226,20 +227,14 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                   <td style={{ fontWeight: 700, color: '#64748B' }}>#{hymn.number}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {hymn.coverImageUrl ? (
-                        <img 
-                          src={hymn.coverImageUrl} 
-                          alt={hymn.title} 
-                          style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#F1F3F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Music size={18} color="#64748B" />
-                        </div>
-                      )}
+                      <img 
+                        src={hymn.coverImageUrl || DEFAULT_HYMN_COVER_URL} 
+                        alt={hymn.title} 
+                        style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_HYMN_COVER_URL;
+                        }}
+                      />
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontWeight: 700, color: '#0F172A' }}>{hymn.title}</span>
@@ -274,60 +269,70 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                     {Math.floor(hymn.duration / 60)}:{(Math.round(hymn.duration % 60)).toString().padStart(2, '0')}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        onClick={() => togglePlayStem(hymn, 'vocal')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 9999,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? '#4F46E5' : '#EEF2FF',
-                          color: activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? '#FFFFFF' : '#4F46E5',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}
-                      >
-                        {activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? <Pause size={10} /> : <Play size={10} />}
-                        <span>Vocal</span>
-                      </button>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {hymn.vocalURL && (
+                        <button
+                          onClick={() => togglePlayStem(hymn, 'vocal')}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? '#4F46E5' : '#EEF2FF',
+                            color: activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? '#FFFFFF' : '#4F46E5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          {activeStem?.id === hymn.id && activeStem.stem === 'vocal' ? <Pause size={10} /> : <Play size={10} />}
+                          <span>Vocal</span>
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() => togglePlayStem(hymn, 'instrumental')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 9999,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? '#16A34A' : '#F0FDF4',
-                          color: activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? '#FFFFFF' : '#16A34A',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}
-                      >
-                        {activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? <Pause size={10} /> : <Play size={10} />}
-                        <span>Inst</span>
-                      </button>
+                      {hymn.instrumentalURL && (
+                        <button
+                          onClick={() => togglePlayStem(hymn, 'instrumental')}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? '#16A34A' : '#F0FDF4',
+                            color: activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? '#FFFFFF' : '#16A34A',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          {activeStem?.id === hymn.id && activeStem.stem === 'instrumental' ? <Pause size={10} /> : <Play size={10} />}
+                          <span>Inst</span>
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() => togglePlayStem(hymn, 'congregation')}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 9999,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? '#9333EA' : '#FAF5FF',
-                          color: activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? '#FFFFFF' : '#9333EA',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}
-                      >
-                        {activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? <Pause size={10} /> : <Play size={10} />}
-                        <span>Choir</span>
-                      </button>
+                      {hymn.congregationURL && (
+                        <button
+                          onClick={() => togglePlayStem(hymn, 'congregation')}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? '#9333EA' : '#FAF5FF',
+                            color: activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? '#FFFFFF' : '#9333EA',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                        >
+                          {activeStem?.id === hymn.id && activeStem.stem === 'congregation' ? <Pause size={10} /> : <Play size={10} />}
+                          <span>Choir</span>
+                        </button>
+                      )}
+
+                      {!hymn.vocalURL && !hymn.instrumentalURL && !hymn.congregationURL && (
+                        <span style={{ fontSize: 11, color: '#94A3B8' }}>No audio</span>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -359,7 +364,7 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                         <Pencil size={14} />
                       </button>
                       <a 
-                        href={hymn.coverImageUrl} 
+                        href={hymn.coverImageUrl || DEFAULT_HYMN_COVER_URL} 
                         target="_blank" 
                         rel="noreferrer"
                         style={{

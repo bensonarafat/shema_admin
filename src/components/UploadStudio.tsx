@@ -257,10 +257,10 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         <div className="flat-card" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>1. Item Type & Metadata</h3>
 
-          {/* Type Selector (sets isHymn boolean flag) */}
+          {/* Type Selector (Hymn vs Psalm) */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: '#64748B', display: 'block', marginBottom: 8 }}>
-              Track Type (sets isHymn boolean for iOS App)
+              Track Type
             </label>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -277,10 +277,9 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 8
                 }}
               >
-                <span>Hymn (isHymn: true)</span>
+                <span>Hymn</span>
               </button>
               <button
                 type="button"
@@ -296,10 +295,9 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 8
                 }}
               >
-                <span>Psalm (isHymn: false)</span>
+                <span>Psalm</span>
               </button>
             </div>
           </div>

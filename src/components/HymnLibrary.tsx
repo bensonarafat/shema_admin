@@ -133,7 +133,7 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                 color: typeFilter === 'hymn' ? '#FFFFFF' : '#64748B',
               }}
             >
-              Hymns (isHymn: true)
+              Hymns
             </button>
             <button
               onClick={() => setTypeFilter('psalm')}
@@ -146,7 +146,7 @@ export const HymnLibrary: React.FC<HymnLibraryProps> = ({
                 color: typeFilter === 'psalm' ? '#FFFFFF' : '#64748B',
               }}
             >
-              Psalms (isHymn: false)
+              Psalms
             </button>
           </div>
         </div>

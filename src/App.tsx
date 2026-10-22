@@ -7,6 +7,7 @@ import { UploadStudio } from './components/UploadStudio';
 import { HymnLibrary } from './components/HymnLibrary';
 import { R2Settings } from './components/R2Settings';
 import { UsersView } from './components/UsersView';
+import { NotificationsView } from './components/NotificationsView';
 import { DevotionsView } from './components/DevotionsView';
 import { PrayersView } from './components/PrayersView';
 import { LoginView } from './components/LoginView';
@@ -155,6 +156,11 @@ export function App() {
             <Route 
               path="/users" 
               element={<UsersView />} 
+            />
+
+            <Route 
+              path="/notifications" 
+              element={<NotificationsView />} 
             />
 
             <Route 

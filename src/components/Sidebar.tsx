@@ -7,6 +7,7 @@ import {
   BookOpen, 
   Heart, 
   Users, 
+  Bell,
   Settings 
 } from 'lucide-react';
 
@@ -81,6 +82,16 @@ export const Sidebar: React.FC = () => {
             >
               <Users size={18} />
               <span>Users</span>
+            </NavLink>
+          </li>
+
+          <li>
+            <NavLink
+              to="/notifications"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <Bell size={18} />
+              <span>Notifications</span>
             </NavLink>
           </li>
 

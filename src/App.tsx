@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { HomeDashboard } from './components/HomeDashboard';
 import { UploadStudio } from './components/UploadStudio';
 import { HymnLibrary } from './components/HymnLibrary';
+import { VideosView } from './components/VideosView';
 import { R2Settings } from './components/R2Settings';
 import { UsersView } from './components/UsersView';
 import { NotificationsView } from './components/NotificationsView';
@@ -141,6 +142,11 @@ export function App() {
                   onRefresh={loadHymns}
                 />
               } 
+            />
+
+            <Route 
+              path="/videos" 
+              element={<VideosView />} 
             />
 
             <Route 

@@ -4,6 +4,7 @@ import {
   Home, 
   UploadCloud, 
   Music, 
+  Video,
   BookOpen, 
   Heart, 
   Users, 
@@ -52,6 +53,16 @@ export const Sidebar: React.FC = () => {
             >
               <Music size={18} />
               <span>Hymn Library</span>
+            </NavLink>
+          </li>
+
+          <li>
+            <NavLink
+              to="/videos"
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <Video size={18} />
+              <span>Videos</span>
             </NavLink>
           </li>
 

@@ -1,25 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { BookOpen, Sparkles, Award, Eye, Calendar, X } from 'lucide-react';
+import { BookOpen, Sparkles, Award, Eye, Calendar, X, Video, UploadCloud, Film } from 'lucide-react';
 import { Shimmer, DevotionTableSkeleton, DevotionDetailSkeleton } from './Shimmer';
-
-interface DevotionItem {
-  id: string; // YYYY-MM-DD
-  date?: string;
-  reference?: string;
-  gems?: number;
-  xp?: number;
-  createdAt?: any;
-}
-
-interface DevotionDetail {
-  theme?: string;
-  reflection?: string;
-  prayer?: string;
-  actionStep?: string;
-  verses?: any[];
-}
+import { DevotionVideoModal } from './DevotionVideoModal';
+import type { DevotionItem, DevotionDetail } from '../types/devotion';
 
 export const DevotionsView: React.FC = () => {
   const [devotions, setDevotions] = useState<DevotionItem[]>([]);
@@ -28,6 +13,11 @@ export const DevotionsView: React.FC = () => {
   const [detail, setDetail] = useState<DevotionDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Video Upload / Management Modal State
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [videoModalDevotion, setVideoModalDevotion] = useState<DevotionItem | null>(null);
+  const [initialVideoDate, setInitialVideoDate] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, 'devotions'));
@@ -35,8 +25,8 @@ export const DevotionsView: React.FC = () => {
       q,
       (snapshot) => {
         const liveDevotions: DevotionItem[] = [];
-        snapshot.forEach((doc) => {
-          liveDevotions.push({ id: doc.id, ...(doc.data() as any) });
+        snapshot.forEach((docSnap) => {
+          liveDevotions.push({ id: docSnap.id, ...(docSnap.data() as any) });
         });
         // Sort descending by date
         liveDevotions.sort((a, b) => b.id.localeCompare(a.id));
@@ -71,10 +61,33 @@ export const DevotionsView: React.FC = () => {
     }
   };
 
+  const openVideoModal = (devotion?: DevotionItem) => {
+    if (devotion) {
+      setVideoModalDevotion(devotion);
+      setInitialVideoDate(devotion.date || devotion.id);
+    } else {
+      setVideoModalDevotion(null);
+      // Default to next upcoming day (or today)
+      setInitialVideoDate(new Date().toISOString().split('T')[0]);
+    }
+    setIsVideoModalOpen(true);
+  };
+
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const devotionsWithVideo = devotions.filter(
+    (d) => d.hasVideo || Boolean(d.videoUrl) || Boolean(d.video)
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Top Banner Card */}
-      <div className="flat-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="flat-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Daily Devotions</span>
@@ -92,6 +105,22 @@ export const DevotionsView: React.FC = () => {
               <BookOpen size={12} />
               <span>AI DEVOTIONS</span>
             </div>
+            {devotionsWithVideo.length > 0 && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: '#EEEDFE',
+                padding: '2px 8px',
+                borderRadius: 9999,
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#5B4DFC',
+              }}>
+                <Film size={12} />
+                <span>{devotionsWithVideo.length} VIDEOS ATTACHED</span>
+              </div>
+            )}
           </div>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, marginBottom: 4 }}>
@@ -104,10 +133,30 @@ export const DevotionsView: React.FC = () => {
                 {devotions.length} <span style={{ fontSize: 20, fontWeight: 500, color: '#64748B' }}>devotions</span>
               </div>
               <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-                Generated daily via Gemini AI scheduler
+                Daily scriptures & reflections • Upload videos for 2–3 key days per week (e.g. Tue/Thu)
               </div>
             </>
           )}
+        </div>
+
+        {/* Action Button: Attach Video */}
+        <div>
+          <button
+            onClick={() => openVideoModal()}
+            className="btn-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '12px 20px',
+              fontSize: 14,
+              fontWeight: 700,
+              borderRadius: 12,
+            }}
+          >
+            <Video size={17} />
+            <span>+ Attach Video to Date</span>
+          </button>
         </div>
       </div>
 
@@ -151,7 +200,7 @@ export const DevotionsView: React.FC = () => {
               No devotions found in Firebase
             </div>
             <p style={{ fontSize: 13, color: '#64748B', maxWidth: 400 }}>
-              Devotions run on a daily cron schedule via Firebase Cloud Functions.
+              Devotions run on a daily cron schedule via Firebase Cloud Functions. You can also attach videos in advance for upcoming dates.
             </p>
           </div>
         ) : (
@@ -160,68 +209,122 @@ export const DevotionsView: React.FC = () => {
               <tr>
                 <th>DATE</th>
                 <th>SCRIPTURE REFERENCE</th>
+                <th>VIDEO (CLOUDFLARE R2)</th>
                 <th>REWARDS</th>
                 <th>STATUS</th>
                 <th>ACTION</th>
               </tr>
             </thead>
             <tbody>
-              {devotions.map((dev) => (
-                <tr key={dev.id}>
-                  <td style={{ fontWeight: 700, color: '#0F172A' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Calendar size={14} color="#5B4DFC" />
-                      <span>{dev.date || dev.id}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span style={{ 
-                      backgroundColor: '#F1F3F6', 
-                      padding: '4px 12px', 
-                      borderRadius: 9999, 
-                      fontSize: 13, 
-                      fontWeight: 700,
-                      color: '#0F172A' 
-                    }}>
-                      {dev.reference || 'Daily Scripture'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: 9999 }}>
-                        <Sparkles size={12} />
-                        <span>+{dev.gems || 10} Gems</span>
+              {devotions.map((dev) => {
+                const hasVideo = dev.hasVideo || Boolean(dev.videoUrl) || Boolean(dev.video);
+                return (
+                  <tr key={dev.id}>
+                    <td style={{ fontWeight: 700, color: '#0F172A' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Calendar size={14} color="#5B4DFC" />
+                        <span>{dev.date || dev.id}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{ 
+                        backgroundColor: '#F1F3F6', 
+                        padding: '4px 12px', 
+                        borderRadius: 9999, 
+                        fontSize: 13, 
+                        fontWeight: 700,
+                        color: '#0F172A' 
+                      }}>
+                        {dev.reference || 'Daily Scripture'}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#2563EB', backgroundColor: '#EFF6FF', padding: '2px 8px', borderRadius: 9999 }}>
-                        <Award size={12} />
-                        <span>+{dev.xp || 25} XP</span>
+                    </td>
+                    <td>
+                      {hasVideo ? (
+                        <button
+                          onClick={() => openVideoModal(dev)}
+                          title="Manage Cloudflare Video"
+                          style={{
+                            backgroundColor: '#EEEDFE',
+                            color: '#5B4DFC',
+                            border: '1px solid #C7D2FE',
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <Video size={13} />
+                          <span>
+                            {dev.videoDuration
+                              ? `Video (${formatDuration(dev.videoDuration)})`
+                              : 'Video Attached'}
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => openVideoModal(dev)}
+                          title="Upload video to Cloudflare R2"
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            color: '#64748B',
+                            border: '1px dashed #CBD5E1',
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <UploadCloud size={13} />
+                          <span>+ Add Video</span>
+                        </button>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: 9999 }}>
+                          <Sparkles size={12} />
+                          <span>+{dev.gems || 10} Gems</span>
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#2563EB', backgroundColor: '#EFF6FF', padding: '2px 8px', borderRadius: 9999 }}>
+                          <Award size={12} />
+                          <span>+{dev.xp || 25} XP</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="status-pill success">
+                        <span className="dot"></span>
+                        <span>Published</span>
                       </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="status-pill success">
-                      <span className="dot"></span>
-                      <span>Published</span>
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => openDevotionDetail(dev)}
-                      className="btn-secondary"
-                      style={{ padding: '6px 12px', fontSize: 12 }}
-                    >
-                      <Eye size={12} />
-                      <span>Inspect</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => openDevotionDetail(dev)}
+                        className="btn-secondary"
+                        style={{ padding: '6px 12px', fontSize: 12 }}
+                      >
+                        <Eye size={12} />
+                        <span>Inspect</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Devotion Detail Modal */}
+      {/* Devotion Detail Modal (Inspector) */}
       {selectedDevotion && (
         <div style={{
           position: 'fixed',
@@ -240,7 +343,7 @@ export const DevotionsView: React.FC = () => {
             borderRadius: 20,
             padding: 32,
             width: '90%',
-            maxWidth: 620,
+            maxWidth: 640,
             maxHeight: '85vh',
             overflowY: 'auto',
             display: 'flex',
@@ -269,6 +372,64 @@ export const DevotionsView: React.FC = () => {
               <DevotionDetailSkeleton />
             ) : detail ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Devotion Video Section */}
+                {(detail.video || selectedDevotion.hasVideo || selectedDevotion.videoUrl) ? (
+                  <div style={{ backgroundColor: '#F8F9FB', padding: 16, borderRadius: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#5B4DFC', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Video size={14} />
+                        <span>CLOUDFLARE R2 DEVOTION VIDEO</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const target = selectedDevotion;
+                          setSelectedDevotion(null);
+                          openVideoModal(target);
+                        }}
+                        className="btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700 }}
+                      >
+                        Manage Video
+                      </button>
+                    </div>
+
+                    <div style={{ borderRadius: 10, overflow: 'hidden', backgroundColor: '#0B1118' }}>
+                      <video
+                        src={detail.video?.url || selectedDevotion.videoUrl}
+                        poster={detail.video?.thumbnailUrl || selectedDevotion.videoThumbnailUrl}
+                        controls
+                        style={{ width: '100%', maxHeight: 260, objectFit: 'contain' }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    backgroundColor: '#F8FAFC',
+                    border: '1px dashed #E2E8F0',
+                    padding: 14,
+                    borderRadius: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>No video attached for this date</div>
+                      <div style={{ fontSize: 11, color: '#64748B' }}>Upload an MP4/MOV reflection video to Cloudflare R2</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const target = selectedDevotion;
+                        setSelectedDevotion(null);
+                        openVideoModal(target);
+                      }}
+                      className="btn-primary"
+                      style={{ padding: '6px 14px', fontSize: 12 }}
+                    >
+                      + Add Video
+                    </button>
+                  </div>
+                )}
+
                 {detail.theme && (
                   <div style={{ backgroundColor: '#F8F9FB', padding: 14, borderRadius: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>THEME</div>
@@ -304,6 +465,18 @@ export const DevotionsView: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Cloudflare Video Upload & Management Modal */}
+      {isVideoModalOpen && (
+        <DevotionVideoModal
+          devotion={videoModalDevotion}
+          initialDate={initialVideoDate}
+          onClose={() => setIsVideoModalOpen(false)}
+          onSuccess={() => {
+            setIsVideoModalOpen(false);
+          }}
+        />
       )}
     </div>
   );

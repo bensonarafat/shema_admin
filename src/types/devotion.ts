@@ -2,7 +2,7 @@ export interface DevotionVideo {
   url: string;
   thumbnailUrl?: string;
   duration: number; // Duration in seconds
-  title?: string;
+  title: string; // Required
   speaker?: string;
   aspectRatio?: '9:16' | '16:9' | string;
   fileSize?: number;
@@ -40,7 +40,7 @@ export interface DevotionDetail {
 export interface DevotionVideoUploadPayload {
   date: string;
   file: File;
-  title?: string;
+  title: string;
   speaker?: string;
   customThumbnail?: File | Blob;
 }

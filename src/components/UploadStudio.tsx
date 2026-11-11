@@ -11,10 +11,12 @@ import {
   ArrowLeft,
   Link as LinkIcon,
   Pencil,
+  Bell,
   X
 } from 'lucide-react';
 import { slugify, detectAudioDuration, uploadFileToR2, uploadHymnMetadataJson } from '../services/uploadService';
 import { saveHymnToFirestore } from '../services/hymnService';
+import { sendAdminNotificationJob } from '../services/notificationAdminService';
 import { getStoredR2Config } from '../config/r2';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { Hymn, UploadProgress } from '../types/hymn';
@@ -51,6 +53,7 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
   const [category, setCategory] = useState(hymnToEdit?.category || 'Grace & Mercy');
   const [isHymn, setIsHymn] = useState<boolean>(hymnToEdit ? hymnToEdit.isHymn !== false : true);
   const [isDailyFeatured, setIsDailyFeatured] = useState<boolean>(Boolean(hymnToEdit?.isDailyFeatured));
+  const [notifyUsers, setNotifyUsers] = useState<boolean>(!isEditing);
   const [lyricsFullText, setLyricsFullText] = useState(hymnToEdit?.lyricsFullText || '');
   const [duration, setDuration] = useState<number>(hymnToEdit?.duration || 0);
 
@@ -263,6 +266,8 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
         congregationURL,
         lyricsFullText: lyricsFullText.trim(),
         status: 'published',
+        notifyUsers,
+        notificationDispatched: notifyUsers,
         createdAt: hymnToEdit?.createdAt || new Date().toISOString(),
       };
 
@@ -280,6 +285,26 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
       // 7. Write directly to Firestore hymns collection
       setStatusMessage('Syncing live with Firebase Firestore...');
       await saveHymnToFirestore(hymnRecord);
+
+      // 8. Broadcast push notification to all users if enabled
+      if (notifyUsers) {
+        try {
+          setStatusMessage('Sending push notification to all users...');
+          const label = hymnRecord.isHymn ? 'Hymn' : 'Psalm';
+          await sendAdminNotificationJob({
+            title: hymnRecord.isHymn ? 'New Hymn Added 🎵' : 'New Psalm Added 📖',
+            body: `Listen to ${label} #${hymnRecord.number}: "${hymnRecord.title}" on Shema.`,
+            target: 'all',
+            deepLink: hymnRecord.isHymn ? 'hymns' : 'psalms',
+            customData: {
+              hymnId: hymnRecord.id,
+              isHymn: String(hymnRecord.isHymn),
+            },
+          });
+        } catch (notifErr) {
+          console.warn('Push notification broadcast warning:', notifErr);
+        }
+      }
 
       setStatusMessage(isEditing ? 'Hymn updated successfully!' : 'Published successfully!');
       if (onSuccess) onSuccess(hymnRecord);
@@ -504,6 +529,40 @@ export const UploadStudio: React.FC<UploadStudioProps> = ({
                 Featured Hymn of the Day
               </label>
             </div>
+          </div>
+
+          {/* Push Notification Toggle */}
+          <div
+            onClick={() => setNotifyUsers(!notifyUsers)}
+            style={{
+              backgroundColor: notifyUsers ? '#EEF2FF' : '#F8FAFC',
+              border: notifyUsers ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+              padding: '12px 14px',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Bell size={16} color={notifyUsers ? '#5B4DFC' : '#64748B'} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                  Send Push Notification to All Users
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B' }}>
+                  Alerts every user that this {isHymn ? 'Hymn' : 'Psalm'} is now available to stream
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={notifyUsers}
+              onChange={(e) => setNotifyUsers(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 18, height: 18, accentColor: '#5B4DFC', cursor: 'pointer' }}
+            />
           </div>
 
           {/* Folder Path Preview */}

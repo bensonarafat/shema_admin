@@ -5,7 +5,8 @@ export interface AdminNotification {
   target: 'all' | 'active_subscribers' | 'user';
   targetUserId?: string;
   targetUserEmail?: string;
-  deepLink?: string; // 'devotions' | 'bible_study' | 'prayers' | 'home'
+  deepLink?: string; // 'shorts' | 'hymns' | 'psalms' | 'devotion_video' | 'devotions' | 'bible_study' | 'prayers' | 'home'
+  customData?: Record<string, string>;
   status?: 'pending' | 'sent' | 'failed';
   createdAt?: any;
   sentAt?: any;

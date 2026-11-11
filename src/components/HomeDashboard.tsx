@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ArrowUpRight, Play, CheckCircle, Disc, BookOpen, Heart, Users, Pencil } from 'lucide-react';
+import { Plus, ArrowUpRight, Play, CheckCircle, Disc, BookOpen, Heart, Users, Pencil, Bell, Video } from 'lucide-react';
 import type { Hymn } from '../types/hymn';
 import { Shimmer, HymnTableSkeleton } from './Shimmer';
 import { DEFAULT_HYMN_COVER_URL } from './UploadStudio';
@@ -137,6 +137,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <Users size={20} />
             </div>
             <span className="quick-action-label">Users</span>
+          </div>
+
+          <div className="quick-action-item" onClick={() => navigate('/videos')}>
+            <div className="quick-action-circle">
+              <Video size={20} />
+            </div>
+            <span className="quick-action-label">Videos</span>
+          </div>
+
+          <div className="quick-action-item" onClick={() => navigate('/notifications')}>
+            <div className="quick-action-circle">
+              <span className="badge-hot">PUSH</span>
+              <Bell size={20} />
+            </div>
+            <span className="quick-action-label">Send Push</span>
           </div>
         </div>
       </div>

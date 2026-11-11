@@ -14,6 +14,8 @@ export interface WorshipVideo {
   likes?: number;
   status?: 'published' | 'draft';
   fileSize?: number;
+  notifyUsers?: boolean;
+  notificationDispatched?: boolean;
   createdAt?: any;
   updatedAt?: any;
 }

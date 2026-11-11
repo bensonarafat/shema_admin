@@ -15,6 +15,8 @@ export interface Hymn {
   createdAt?: string;
   updatedAt?: string;
   status?: 'published' | 'draft';
+  notifyUsers?: boolean;
+  notificationDispatched?: boolean;
 }
 
 export interface UploadProgress {

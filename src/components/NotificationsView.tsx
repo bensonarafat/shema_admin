@@ -9,9 +9,10 @@ import {
   Smartphone,
   ShieldCheck,
   RefreshCw,
-  Search
+  Search,
+  Sparkles
 } from 'lucide-react';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
   sendAdminNotificationJob,
@@ -24,8 +25,47 @@ interface UserOption {
   fullName?: string;
   email?: string;
   username?: string;
-  fcmToken?: string;
 }
+
+interface QuickTemplate {
+  label: string;
+  title: string;
+  body: string;
+  deepLink: string;
+}
+
+const QUICK_TEMPLATES: QuickTemplate[] = [
+  {
+    label: '🎬 New Worship Video',
+    title: 'New Worship Video 🎬',
+    body: 'Watch our latest worship session now streaming on Shema.',
+    deepLink: 'shorts',
+  },
+  {
+    label: '🎵 New Hymn',
+    title: 'New Hymn Added 🎵',
+    body: 'A new multi-stem hymn is now available in the Worship library.',
+    deepLink: 'hymns',
+  },
+  {
+    label: '📖 New Psalm',
+    title: 'New Psalm Added 📖',
+    body: 'Listen and meditate on the newest Psalm added to Shema.',
+    deepLink: 'psalms',
+  },
+  {
+    label: '🙏 Devotion Video',
+    title: 'New Devotion Video 🙏',
+    body: "Today's guided devotion video is ready to watch on Shema.",
+    deepLink: 'devotion_video',
+  },
+  {
+    label: '☀️ Morning Reminder',
+    title: 'Time for the Word ☀️',
+    body: "Start your day with Scripture! Complete today's devotion to unlock your apps.",
+    deepLink: 'devotions',
+  },
+];
 
 export const NotificationsView: React.FC = () => {
   const [title, setTitle] = useState('');
@@ -40,6 +80,7 @@ export const NotificationsView: React.FC = () => {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
+  const [selectedUserDevicesCount, setSelectedUserDevicesCount] = useState<number | null>(null);
 
   // History & Live State
   const [history, setHistory] = useState<AdminNotification[]>([]);
@@ -66,20 +107,44 @@ export const NotificationsView: React.FC = () => {
     const q = query(collection(db, 'users'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: UserOption[] = [];
-      snapshot.forEach((doc) => {
-        const d = doc.data() as any;
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
         list.push({
-          id: doc.id,
+          id: docSnap.id,
           fullName: d.fullName,
           email: d.email,
           username: d.username,
-          fcmToken: d.fcmToken,
         });
       });
       setUsers(list);
     });
     return () => unsubscribe();
   }, []);
+
+  // Check users/{uid}/devices subcollection when a single user is selected
+  useEffect(() => {
+    if (!selectedUser) {
+      setSelectedUserDevicesCount(null);
+      return;
+    }
+
+    let cancelled = false;
+    getDocs(collection(db, 'users', selectedUser.id, 'devices'))
+      .then((snap) => {
+        if (!cancelled) {
+          setSelectedUserDevicesCount(snap.size);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedUserDevicesCount(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.id]);
 
   // Handle Send
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -110,8 +175,8 @@ export const NotificationsView: React.FC = () => {
       setFeedback({
         type: 'success',
         message: target === 'all'
-          ? 'Broadcast notification queued successfully for all devices!'
-          : 'Targeted push notification queued successfully!',
+          ? 'Broadcast notification dispatched to all users!'
+          : 'Targeted push notification dispatched successfully!',
       });
 
       // Reset form fields
@@ -130,7 +195,14 @@ export const NotificationsView: React.FC = () => {
     }
   };
 
-  const searchedUsers = users.filter(u => {
+  const applyTemplate = (tpl: QuickTemplate) => {
+    setTitle(tpl.title);
+    setBody(tpl.body);
+    setDeepLink(tpl.deepLink);
+    setFeedback(null);
+  };
+
+  const searchedUsers = users.filter((u) => {
     if (!userSearch) return true;
     const term = userSearch.toLowerCase();
     return (
@@ -141,6 +213,27 @@ export const NotificationsView: React.FC = () => {
   }).slice(0, 5);
 
   const totalDelivered = history.reduce((acc, curr) => acc + (curr.deliveredCount || 0), 0);
+
+  const formatDeepLinkBadge = (dl?: string) => {
+    switch (dl) {
+      case 'shorts':
+        return '🎬 Worship Videos';
+      case 'hymns':
+        return '🎵 Hymns';
+      case 'psalms':
+        return '📖 Psalms';
+      case 'devotion_video':
+        return '🙏 Devotion Video';
+      case 'devotions':
+        return '📖 Devotions';
+      case 'bible_study':
+        return '📚 Bible Study';
+      case 'prayers':
+        return '❤️ Prayers';
+      default:
+        return '🏠 Home';
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -168,7 +261,7 @@ export const NotificationsView: React.FC = () => {
             Broadcast & Targeted Push
           </div>
           <div style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-            Send daily morning scriptures, evening studies, and prayer alerts directly to Shema iOS users.
+            Send custom announcements anytime, or review automatic alerts sent when uploading videos, hymns, and psalms.
           </div>
         </div>
 
@@ -184,7 +277,7 @@ export const NotificationsView: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, backgroundColor: '#F8F9FB', padding: '12px 20px', borderRadius: 14 }}>
             <Users size={20} color="#059669" />
             <div>
-              <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Deliveries</div>
+              <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Total Dispatches</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 2 }}>{totalDelivered}</div>
             </div>
           </div>
@@ -198,7 +291,37 @@ export const NotificationsView: React.FC = () => {
             <Send size={18} color="#5B4DFC" />
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>Compose Push Notification</h3>
           </div>
-          <span style={{ fontSize: 12, color: '#64748B' }}>Instant Remote Dispatch</span>
+          <span style={{ fontSize: 12, color: '#64748B' }}>Instant Remote Dispatch Anytime</span>
+        </div>
+
+        {/* Quick Templates Row */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#64748B', marginBottom: 8 }}>
+            <Sparkles size={13} color="#5B4DFC" />
+            <span>Quick Templates (Click to pre-fill)</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {QUICK_TEMPLATES.map((tpl) => (
+              <button
+                key={tpl.label}
+                type="button"
+                onClick={() => applyTemplate(tpl)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 9999,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tpl.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {feedback && (
@@ -301,13 +424,27 @@ export const NotificationsView: React.FC = () => {
           {target === 'user' && (
             <div style={{ backgroundColor: '#F8FAFC', padding: 16, borderRadius: 10, border: '1px solid #E2E8F0' }}>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
-                Select Recipient User
+                Select Recipient User (reads tokens from <code style={{ color: '#5B4DFC' }}>users/&#123;uid&#125;/devices</code>)
               </label>
               {selectedUser ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', padding: '10px 14px', borderRadius: 8, border: '1px solid #CBD5E1' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{selectedUser.fullName || selectedUser.username || 'User'}</div>
-                    <div style={{ fontSize: 11, color: '#64748B' }}>{selectedUser.email || selectedUser.id}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                      {selectedUser.fullName || selectedUser.username || 'User'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748B', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{selectedUser.email || selectedUser.id}</span>
+                      {selectedUserDevicesCount !== null && (
+                        <span style={{
+                          color: selectedUserDevicesCount > 0 ? '#059669' : '#D97706',
+                          fontWeight: 700,
+                        }}>
+                          • {selectedUserDevicesCount > 0
+                            ? `✓ ${selectedUserDevicesCount} Registered Device${selectedUserDevicesCount > 1 ? 's' : ''}`
+                            : 'No registered devices in subcollection yet'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -351,7 +488,7 @@ export const NotificationsView: React.FC = () => {
                             }}
                           >
                             <span style={{ fontWeight: 600, color: '#0F172A' }}>{u.fullName || u.email}</span>
-                            <span style={{ color: '#94A3B8', fontSize: 11 }}>{u.fcmToken ? '✓ Device Token Available' : 'No token yet'}</span>
+                            <span style={{ color: '#64748B', fontSize: 11 }}>{u.email}</span>
                           </div>
                         ))
                       )}
@@ -370,7 +507,7 @@ export const NotificationsView: React.FC = () => {
             </div>
             <input
               type="text"
-              placeholder="e.g. Time for Bible Readinh"
+              placeholder="e.g. New Worship Video 🎬"
               value={title}
               maxLength={60}
               onChange={(e) => setTitle(e.target.value)}
@@ -394,7 +531,7 @@ export const NotificationsView: React.FC = () => {
             </div>
             <textarea
               rows={4}
-              placeholder="e.g. Start your day with Scripture! Complete today's reading to unlock your apps."
+              placeholder="e.g. Watch our latest worship session or complete today's reading!"
               value={body}
               maxLength={160}
               onChange={(e) => setBody(e.target.value)}
@@ -431,10 +568,14 @@ export const NotificationsView: React.FC = () => {
                 boxSizing: 'border-box',
               }}
             >
-              <option value="devotions">Daily Devotion / Reading Screen</option>
-              <option value="bible_study">Bible Study Topic Screen</option>
-              <option value="prayers">Community Prayers Screen</option>
-              <option value="home">Shema Home Dashboard</option>
+              <option value="shorts">🎬 Worship Videos / Shorts Feed</option>
+              <option value="hymns">🎵 Hymns Library</option>
+              <option value="psalms">📖 Psalms Library</option>
+              <option value="devotion_video">🙏 Guided Devotion Video Reel</option>
+              <option value="devotions">📖 Daily Devotion / Reading Screen</option>
+              <option value="bible_study">📚 Bible Study Topic Screen</option>
+              <option value="prayers">❤️ Community Prayers Screen</option>
+              <option value="home">🏠 Shema Home Dashboard</option>
             </select>
           </div>
 
@@ -541,9 +682,7 @@ export const NotificationsView: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: '12px 14px', color: '#64748B' }}>
-                        <span style={{ textTransform: 'capitalize' }}>
-                          {item.deepLink === 'devotions' ? '📖 Devotions' : item.deepLink === 'bible_study' ? '📚 Bible Study' : item.deepLink === 'prayers' ? '🙏 Prayers' : '🏠 Home'}
-                        </span>
+                        <span>{formatDeepLinkBadge(item.deepLink)}</span>
                       </td>
                       <td style={{ padding: '12px 14px' }}>
                         <span style={{
@@ -564,7 +703,7 @@ export const NotificationsView: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#0F172A' }}>
-                        {item.deliveredCount ?? (item.target === 'all' ? 'Broadcast' : 1)}
+                        {item.target === 'all' ? 'Broadcast' : (item.deliveredCount ?? 1)}
                       </td>
                     </tr>
                   );

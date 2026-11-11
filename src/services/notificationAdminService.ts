@@ -26,7 +26,9 @@ export async function sendAdminNotificationJob(notification: AdminNotification):
       body: notification.body,
       target: notification.target,
       targetUserId: notification.targetUserId,
+      targetUserEmail: notification.targetUserEmail,
       deepLink: notification.deepLink || 'home',
+      customData: notification.customData,
     });
     
     const data = result.data as any;
@@ -45,6 +47,7 @@ export async function sendAdminNotificationJob(notification: AdminNotification):
     targetUserId: notification.targetUserId || null,
     targetUserEmail: notification.targetUserEmail || null,
     deepLink: notification.deepLink || 'home',
+    customData: notification.customData || null,
     status: 'pending',
     senderEmail: currentUser?.email || 'admin@shema.app',
     senderId: currentUser?.uid || 'admin',

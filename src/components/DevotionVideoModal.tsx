@@ -9,6 +9,7 @@ import {
   AlertCircle, 
   RefreshCw,
   ExternalLink,
+  Bell,
   Info
 } from 'lucide-react';
 import { 
@@ -17,6 +18,7 @@ import {
   removeDevotionVideoFromFirestore,
   type VideoMetadata 
 } from '../services/devotionVideoService';
+import { sendAdminNotificationJob } from '../services/notificationAdminService';
 import type { DevotionItem, DevotionVideo } from '../types/devotion';
 
 interface DevotionVideoModalProps {
@@ -39,6 +41,7 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [title, setTitle] = useState<string>(devotion?.videoTitle || devotion?.video?.title || '');
   const [speaker, setSpeaker] = useState<string>(devotion?.videoSpeaker || devotion?.video?.speaker || 'Benson Arafat');
+  const [notifyUsers, setNotifyUsers] = useState<boolean>(true);
   const [isReplacing, setIsReplacing] = useState<boolean>(!devotion?.hasVideo && !devotion?.videoUrl);
   
   // Upload State
@@ -54,7 +57,7 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
     url: devotion.videoUrl,
     thumbnailUrl: devotion.videoThumbnailUrl,
     duration: devotion.videoDuration || 0,
-    title: devotion.videoTitle,
+    title: devotion.videoTitle || 'Daily Devotion Video',
     speaker: devotion.videoSpeaker,
     aspectRatio: devotion.videoAspectRatio || '9:16',
   } : null);
@@ -84,6 +87,12 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
     setError(null);
     setSelectedFile(file);
 
+    // Auto-fill title from filename if title is empty
+    if (!title.trim()) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+    }
+
     try {
       const meta = await extractVideoMetadata(file);
       setMetadata(meta);
@@ -105,6 +114,12 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
     setError(null);
     setSelectedFile(file);
 
+    // Auto-fill title from filename if title is empty
+    if (!title.trim()) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+    }
+
     try {
       const meta = await extractVideoMetadata(file);
       setMetadata(meta);
@@ -122,6 +137,10 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
       setError('Please choose a date for this devotion.');
       return;
     }
+    if (!title.trim()) {
+      setError('Please enter a video title. Title is required.');
+      return;
+    }
 
     setIsUploading(true);
     setError(null);
@@ -132,14 +151,31 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
         date,
         videoFile: selectedFile,
         thumbnailBlob: metadata?.thumbnailBlob,
-        title: title || undefined,
+        title: title.trim(),
         speaker: speaker || undefined,
         aspectRatio: metadata?.aspectRatio || '9:16',
+        notifyUsers,
         onProgress: (percent, loaded, total) => {
           setUploadProgress(percent);
           setBytesUploaded({ loaded, total });
         },
       });
+
+      if (notifyUsers) {
+        try {
+          await sendAdminNotificationJob({
+            title: 'New Devotion Video 🙏',
+            body: `"${title.trim()}"${speaker.trim() ? ` with ${speaker.trim()}` : ''} is ready to watch on Shema.`,
+            target: 'all',
+            deepLink: 'devotion_video',
+            customData: {
+              devotionDate: date,
+            },
+          });
+        } catch (notifErr) {
+          console.warn('Could not dispatch devotion video notification:', notifErr);
+        }
+      }
 
       setSuccessMessage(`Video successfully uploaded to Cloudflare R2 for ${date}!`);
       setTimeout(() => {
@@ -555,8 +591,10 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
             {/* Video Metadata Inputs */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 6 }}>
-                  VIDEO TITLE (OPTIONAL)
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>
+                  <span>VIDEO TITLE</span>
+                  <span style={{ color: '#DC2626' }}>*</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#DC2626', marginLeft: 'auto' }}>REQUIRED</span>
                 </label>
                 <input
                   type="text"
@@ -564,7 +602,11 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   disabled={isUploading}
-                  style={{ width: '100%' }}
+                  required
+                  style={{
+                    width: '100%',
+                    borderColor: !title.trim() && error ? '#DC2626' : undefined,
+                  }}
                 />
               </div>
 
@@ -579,6 +621,42 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
                   onChange={(e) => setSpeaker(e.target.value)}
                   disabled={isUploading}
                   style={{ width: '100%' }}
+                />
+              </div>
+
+              {/* Push Notification Toggle */}
+              <div
+                onClick={() => setNotifyUsers(!notifyUsers)}
+                style={{
+                  backgroundColor: notifyUsers ? '#EEF2FF' : '#F8FAFC',
+                  border: notifyUsers ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  marginTop: 4,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Bell size={16} color={notifyUsers ? '#5B4DFC' : '#64748B'} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                      Send Push Notification to All Users
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748B' }}>
+                      Notifies every user that a new devotion video is ready to watch
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notifyUsers}
+                  onChange={(e) => setNotifyUsers(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={isUploading}
+                  style={{ width: 18, height: 18, accentColor: '#5B4DFC', cursor: 'pointer' }}
                 />
               </div>
             </div>
@@ -651,7 +729,7 @@ export const DevotionVideoModal: React.FC<DevotionVideoModalProps> = ({
                   fontWeight: 700,
                   opacity: isUploading ? 0.7 : 1,
                 }}
-                disabled={isUploading || !selectedFile}
+                disabled={isUploading || !selectedFile || !title.trim()}
               >
                 <UploadCloud size={18} />
                 <span>{isUploading ? 'Uploading to Cloudflare...' : 'Upload to Cloudflare R2'}</span>

@@ -8,6 +8,7 @@ import {
   AlertCircle, 
   RefreshCw, 
   Star,
+  Bell,
   Image as ImageIcon
 } from 'lucide-react';
 import { 
@@ -18,6 +19,7 @@ import {
   slugifyVideo,
   type VideoMetadata 
 } from '../services/videoService';
+import { sendAdminNotificationJob } from '../services/notificationAdminService';
 import { DEFAULT_WORSHIP_CATEGORIES, type WorshipVideo } from '../types/video';
 
 interface UploadVideoModalProps {
@@ -40,6 +42,7 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
   const [description, setDescription] = useState(videoToEdit?.description || '');
   const [tagsInput, setTagsInput] = useState((videoToEdit?.tags || []).join(', '));
   const [isFeatured, setIsFeatured] = useState(Boolean(videoToEdit?.isFeatured));
+  const [notifyUsers, setNotifyUsers] = useState<boolean>(!isEditing);
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -173,6 +176,21 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
         };
 
         await updateWorshipVideoInFirestore(videoToEdit.id, updated);
+        if (notifyUsers) {
+          try {
+            await sendAdminNotificationJob({
+              title: 'New Worship Video 🎬',
+              body: `Watch "${updated.title}"${updated.artist ? ` by ${updated.artist}` : ''} now on Shema.`,
+              target: 'all',
+              deepLink: 'shorts',
+              customData: {
+                videoId: videoToEdit.id,
+              },
+            });
+          } catch (notifErr) {
+            console.warn('Could not dispatch video notification:', notifErr);
+          }
+        }
         setSuccessMessage('Video updated successfully!');
         setTimeout(() => {
           onSuccess(updated);
@@ -207,11 +225,28 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
           tags: parsedTags,
           fileSize: selectedFile!.size,
           status: 'published',
+          notifyUsers,
+          notificationDispatched: notifyUsers,
           views: 0,
           likes: 0,
         };
 
         await saveWorshipVideoToFirestore(newVideo);
+        if (notifyUsers) {
+          try {
+            await sendAdminNotificationJob({
+              title: 'New Worship Video 🎬',
+              body: `Watch "${newVideo.title}"${newVideo.artist ? ` by ${newVideo.artist}` : ''} now on Shema.`,
+              target: 'all',
+              deepLink: 'shorts',
+              customData: {
+                videoId: newVideo.id,
+              },
+            });
+          } catch (notifErr) {
+            console.warn('Could not dispatch video notification:', notifErr);
+          }
+        }
         setSuccessMessage('Video uploaded and published to Cloudflare R2!');
         setTimeout(() => {
           onSuccess(newVideo);
@@ -592,6 +627,53 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
               type="checkbox"
               checked={isFeatured}
               onChange={(e) => setIsFeatured(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: '#5B4DFC', cursor: 'pointer' }}
+              disabled={isUploading}
+            />
+          </div>
+
+          {/* Push Notification Toggle */}
+          <div
+            style={{
+              backgroundColor: notifyUsers ? '#EEF2FF' : '#F8FAFC',
+              border: notifyUsers ? '1px solid #C7D2FE' : '1px solid #E2E8F0',
+              padding: 14,
+              borderRadius: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+            }}
+            onClick={() => setNotifyUsers(!notifyUsers)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: notifyUsers ? '#EEEDFE' : '#E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: notifyUsers ? '#5B4DFC' : '#64748B',
+              }}>
+                <Bell size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
+                  Send Push Notification to All Users
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B' }}>
+                  Broadcasts a notification to every Shema user when this video goes live
+                </div>
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={notifyUsers}
+              onChange={(e) => setNotifyUsers(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
               style={{ width: 18, height: 18, accentColor: '#5B4DFC', cursor: 'pointer' }}
               disabled={isUploading}
             />

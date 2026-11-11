@@ -94,13 +94,14 @@ export const extractVideoMetadata = (file: File): Promise<VideoMetadata> => {
   });
 };
 
-interface UploadDevotionVideoParams {
+export interface UploadDevotionVideoParams {
   date: string; // YYYY-MM-DD
   videoFile: File;
+  title: string;
   thumbnailBlob?: Blob | null;
-  title?: string;
   speaker?: string;
   aspectRatio?: string;
+  notifyUsers?: boolean;
   onProgress?: (percent: number, loadedBytes: number, totalBytes: number) => void;
 }
 
@@ -114,8 +115,13 @@ export const uploadDevotionVideoToCloudflare = async ({
   title,
   speaker,
   aspectRatio = '9:16',
+  notifyUsers = true,
   onProgress,
 }: UploadDevotionVideoParams): Promise<DevotionVideo> => {
+  if (!title || !title.trim()) {
+    throw new Error('Video title is required.');
+  }
+
   const config = getStoredR2Config();
   if (!config.accountId || !config.accessKeyId || !config.secretAccessKey) {
     throw new Error('Cloudflare R2 is not configured. Please enter your credentials in Settings.');
@@ -178,7 +184,7 @@ export const uploadDevotionVideoToCloudflare = async ({
     url: videoUrl,
     thumbnailUrl,
     duration,
-    title: title?.trim() || undefined,
+    title: title.trim(),
     speaker: speaker?.trim() || undefined,
     aspectRatio: aspectRatio || metadata.aspectRatio,
     fileSize: videoFile.size,
@@ -186,7 +192,7 @@ export const uploadDevotionVideoToCloudflare = async ({
   };
 
   // 4. Save to Firestore (both root devotions/{date} and languages/en)
-  await saveDevotionVideoToFirestore(date, devotionVideo);
+  await saveDevotionVideoToFirestore(date, devotionVideo, notifyUsers);
 
   return devotionVideo;
 };
@@ -197,7 +203,8 @@ export const uploadDevotionVideoToCloudflare = async ({
  */
 export const saveDevotionVideoToFirestore = async (
   date: string,
-  video: DevotionVideo
+  video: DevotionVideo,
+  notifyUsers: boolean = true
 ): Promise<void> => {
   const rootRef = doc(db, 'devotions', date);
   const localeEnRef = doc(db, 'devotions', date, 'languages', 'en');
@@ -223,6 +230,8 @@ export const saveDevotionVideoToFirestore = async (
     videoDuration: video.duration || 0,
     videoAspectRatio: video.aspectRatio || '9:16',
     video: cleanVideo,
+    notifyUsers,
+    notificationDispatched: notifyUsers,
     updatedAt: serverTimestamp(),
   };
 

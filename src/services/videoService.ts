@@ -232,6 +232,8 @@ export const saveWorshipVideoToFirestore = async (video: WorshipVideo): Promise<
   if (video.thumbnailUrl) payload.thumbnailUrl = video.thumbnailUrl;
   if (video.fileSize) payload.fileSize = video.fileSize;
   if (video.tags && video.tags.length > 0) payload.tags = video.tags;
+  if (video.notifyUsers !== undefined) payload.notifyUsers = video.notifyUsers;
+  if (video.notificationDispatched !== undefined) payload.notificationDispatched = video.notificationDispatched;
   if (!video.createdAt) payload.createdAt = serverTimestamp();
 
   await setDoc(docRef, payload, { merge: true });
